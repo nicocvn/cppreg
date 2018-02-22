@@ -24,38 +24,41 @@ namespace cppreg {
 #define CPPREG_ACCESSPOLICY_H
 namespace cppreg {
     struct read_only {
-        template <typename T>
-        inline static T read(const T* const mmio_device,
+        template <typename MMIO_t, typename T>
+        inline static T read(const MMIO_t* const mmio_device,
                              const T mask,
                              const Offset_t offset) noexcept {
             return static_cast<T>((*mmio_device & mask) >> offset);
         };
     };
     struct read_write : read_only {
-        template <typename T>
-        inline static void write(T* const mmio_device,
+        template <typename MMIO_t, typename T>
+        inline static void write(MMIO_t* const mmio_device,
                                  const T mask,
                                  const Offset_t offset,
                                  const T value) noexcept {
             *mmio_device = static_cast<T>((*mmio_device & ~mask) |
                                           ((value << offset) & mask));
         };
-        template <typename T>
-        inline static void set(T* const mmio_device, const T mask) noexcept {
+        template <typename MMIO_t, typename T>
+        inline static void set(MMIO_t* const mmio_device, const T mask)
+        noexcept {
             *mmio_device = static_cast<T>((*mmio_device) | mask);
         };
-        template <typename T>
-        inline static void clear(T* const mmio_device, const T mask) noexcept {
+        template <typename MMIO_t, typename T>
+        inline static void clear(MMIO_t* const mmio_device, const T mask)
+        noexcept {
             *mmio_device = static_cast<T>((*mmio_device) & ~mask);
         };
-        template <typename T>
-        inline static void toggle(T* const mmio_device, const T mask) noexcept {
-            *mmio_device ^= mask;
+        template <typename MMIO_t, typename T>
+        inline static void toggle(MMIO_t* const mmio_device, const T mask)
+        noexcept {
+            *mmio_device = static_cast<T>((*mmio_device) ^ mask);
         };
     };
     struct write_only {
-        template <typename T>
-        inline static void write(T* const mmio_device,
+        template <typename MMIO_t, typename T>
+        inline static void write(MMIO_t* const mmio_device,
                                  const T mask,
                                  const Offset_t offset,
                                  const T value) noexcept {
@@ -287,21 +290,19 @@ namespace cppreg {
         };
         inline static type read() noexcept {
             return
-                AccessPolicy
-                ::template read<MMIO_t>(parent_register::ro_mem_pointer(),
-                                        mask,
-                                        offset);
+                AccessPolicy::read(parent_register::ro_mem_pointer(),
+                                   mask,
+                                   offset);
         };
         template <typename T = type>
         inline static void
         write(const typename std::enable_if<
             !parent_register::shadow::use_shadow, T
                                            >::type value) noexcept {
-            AccessPolicy
-            ::template write<MMIO_t>(parent_register::rw_mem_pointer(),
-                                     mask,
-                                     offset,
-                                     value);
+            AccessPolicy::write(parent_register::rw_mem_pointer(),
+                                mask,
+                                offset,
+                                value);
         };
         template <typename T = type>
         inline static void
@@ -311,11 +312,10 @@ namespace cppreg {
             parent_register::shadow::value =
                 (parent_register::shadow::value & ~mask) |
                 ((value << offset) & mask);
-            AccessPolicy
-            ::template write<MMIO_t>(parent_register::rw_mem_pointer(),
-                                     ~(0u),
-                                     0u,
-                                     parent_register::shadow::value);
+            AccessPolicy::write(parent_register::rw_mem_pointer(),
+                                ~(0u),
+                                0u,
+                                parent_register::shadow::value);
         };
         template <type value, typename T = void>
         inline static
@@ -340,16 +340,13 @@ namespace cppreg {
             write(value);
         };
         inline static void set() noexcept {
-            AccessPolicy
-            ::template set<MMIO_t>(parent_register::rw_mem_pointer(), mask);
+            AccessPolicy::set(parent_register::rw_mem_pointer(), mask);
         };
         inline static void clear() noexcept {
-            AccessPolicy
-            ::template clear<MMIO_t>(parent_register::rw_mem_pointer(), mask);
+            AccessPolicy::clear(parent_register::rw_mem_pointer(), mask);
         };
         inline static void toggle() noexcept {
-            AccessPolicy
-            ::template toggle<MMIO_t>(parent_register::rw_mem_pointer(), mask);
+            AccessPolicy::toggle(parent_register::rw_mem_pointer(), mask);
         };
         template <typename T = bool>
         inline static typename std::enable_if<FieldWidth == 1, T>::type

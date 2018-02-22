@@ -90,10 +90,9 @@ namespace cppreg {
          */
         inline static type read() noexcept {
             return
-                AccessPolicy
-                ::template read<MMIO_t>(parent_register::ro_mem_pointer(),
-                                        mask,
-                                        offset);
+                AccessPolicy::read(parent_register::ro_mem_pointer(),
+                                   mask,
+                                   offset);
         };
 
         //! Field write method (shadow value disabled).
@@ -113,11 +112,10 @@ namespace cppreg {
         write(const typename std::enable_if<
             !parent_register::shadow::use_shadow, T
                                            >::type value) noexcept {
-            AccessPolicy
-            ::template write<MMIO_t>(parent_register::rw_mem_pointer(),
-                                     mask,
-                                     offset,
-                                     value);
+            AccessPolicy::write(parent_register::rw_mem_pointer(),
+                                mask,
+                                offset,
+                                value);
         };
 
         //! Field write method (shadow value enabled).
@@ -147,11 +145,10 @@ namespace cppreg {
 
             // Write as a block to the register, that is, we do not use the
             // mask and offset.
-            AccessPolicy
-            ::template write<MMIO_t>(parent_register::rw_mem_pointer(),
-                                     ~(0u),
-                                     0u,
-                                     parent_register::shadow::value);
+            AccessPolicy::write(parent_register::rw_mem_pointer(),
+                                ~(0u),
+                                0u,
+                                parent_register::shadow::value);
 
         };
 
@@ -205,8 +202,7 @@ namespace cppreg {
          * This method will set all bits in the field.
          */
         inline static void set() noexcept {
-            AccessPolicy
-            ::template set<MMIO_t>(parent_register::rw_mem_pointer(), mask);
+            AccessPolicy::set(parent_register::rw_mem_pointer(), mask);
         };
 
         //! Field clear method.
@@ -214,8 +210,7 @@ namespace cppreg {
          * This method will clear all bits in the field.
          */
         inline static void clear() noexcept {
-            AccessPolicy
-            ::template clear<MMIO_t>(parent_register::rw_mem_pointer(), mask);
+            AccessPolicy::clear(parent_register::rw_mem_pointer(), mask);
         };
 
         //! Field toggle method.
@@ -223,8 +218,7 @@ namespace cppreg {
          * This method will toggle all bits in the field.
          */
         inline static void toggle() noexcept {
-            AccessPolicy
-            ::template toggle<MMIO_t>(parent_register::rw_mem_pointer(), mask);
+            AccessPolicy::toggle(parent_register::rw_mem_pointer(), mask);
         };
 
         //! Is field set bool method.
