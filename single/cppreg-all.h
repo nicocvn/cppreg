@@ -134,8 +134,6 @@ namespace cppreg {
     };
     template <typename Register>
     typename Register::type Shadow<Register, true>::value = Register::reset;
-    template <typename Register>
-    const bool Shadow<Register, true>::use_shadow;
 }
 #endif  
 
