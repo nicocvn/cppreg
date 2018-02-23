@@ -239,8 +239,8 @@ namespace leds {
             pin_toggle::set();   // Set PTOR to 1.
         };
         inline static void init() {
-            pin_direction::write(pin_output_dir);
             off();
+            pin_direction::write(pin_output_dir);
         };
 
     }
