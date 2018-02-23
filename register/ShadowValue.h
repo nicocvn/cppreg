@@ -35,6 +35,8 @@ namespace cppreg {
      * @tparam Register Register type.
      *
      * This implementation is for register which do require shadow value.
+     *
+     * See 
      */
     template <typename Register>
     struct Shadow<Register, true> {
@@ -42,7 +44,10 @@ namespace cppreg {
         constexpr static const bool use_shadow = true;
     };
     template <typename Register>
-    typename Register::type Shadow<Register, true>::value = Register::reset;
+    typename Register::type Shadow<Register, true>::value =
+        Register::reset;
+    template <typename Register>
+    constexpr const bool Shadow<Register, true>::use_shadow;
 
 }
 
