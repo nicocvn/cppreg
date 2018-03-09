@@ -11,6 +11,7 @@
 
 
 #include <cstdint>
+#include <limits>
 
 
 #endif  // CPPREG_CPPREG_INCLUDES_H

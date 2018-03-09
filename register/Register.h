@@ -76,30 +76,35 @@ namespace cppreg {
             return reinterpret_cast<const MMIO_t* const>(base_address);
         };
 
-        //! Merge write function.
+        //! Merge write start function.
         /**
-         * @tparam F Field on which to perform the write operation.
-         * @param value Value to write to the field.
-         * @return A merge write data structure.
+         * @tparam F Field on which to perform the first write operation.
+         * @param value Value to be written to the field.
+         * @return A merge write data structure to chain further writes.
          */
         template <typename F>
-        inline static MergeWrite<typename F::parent_register>
+        inline static MergeWrite<typename F::parent_register, F::mask>
         merge_write(const typename F::type value) noexcept {
             return
-                MergeWrite<typename F::parent_register>
-                ::create_instance(((value << F::offset) & F::mask), F::mask);
+                MergeWrite<typename F::parent_register, F::mask>
+                ::make(((value << F::offset) & F::mask));
         };
 
-        //! Merge write function.
+        //! Merge write start function for constant value.
         /**
-         * @tparam F Field on which to perform the write operation.
-         * @param value Value to write to the field.
-         * @return A merge write data structure.
+         * @tparam F Field on which to perform the first write operation.
+         * @tparam value Value to be written to the field.
+         * @return A merge write data structure to chain further writes.
          */
         template <
             typename F,
             type value,
-            typename T = MergeWrite<typename F::parent_register>
+            typename T = MergeWrite_tmpl<
+                typename F::parent_register,
+                F::mask,
+                F::offset,
+                value
+                                        >
         >
         inline static
         typename std::enable_if<
@@ -107,11 +112,9 @@ namespace cppreg {
                 size, value, (F::mask >> F::offset)
                                      >::result::value,
             T
-                               >::type
+                               >::type&&
         merge_write() noexcept {
-            return
-                MergeWrite<typename F::parent_register>
-                ::create_instance(((value << F::offset) & F::mask), F::mask);
+            return std::move(T::make());
         };
 
         // Sanity check.

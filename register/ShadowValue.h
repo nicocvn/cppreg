@@ -49,6 +49,7 @@ namespace cppreg {
     template <typename Register>
     constexpr const bool Shadow<Register, true>::use_shadow;
 
+
 }
 
 

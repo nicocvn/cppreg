@@ -6,6 +6,7 @@
  *
  * This header provides the definitions related to register field
  * implementation.
+ * Strictly speaking a field is defined as a region of a register.
  */
 
 
@@ -27,7 +28,7 @@ namespace cppreg {
      * @tparam BaseRegister Parent register.
      * @tparam width Field width.
      * @tparam offset Field offset.
-     * @tparam P Access policy type (rw, ro, wo).
+     * @tparam P Access policy type.
      *
      * This data structure provides static methods to deal with field access
      * (read, write, set, clear, and toggle). These methods availability depends
@@ -53,26 +54,29 @@ namespace cppreg {
         //! MMIO type.
         using MMIO_t = typename parent_register::MMIO_t;
 
+        //! Field policy.
+        using policy = AccessPolicy;
+
         //! Field width.
         constexpr static const Width_t width = FieldWidth;
 
         //! Field offset.
         constexpr static const Offset_t offset = FieldOffset;
 
-        //! Field policy.
-        using policy = AccessPolicy;
-
         //! Field mask.
-        /**
-         * The field mask is computed at compile time.
-         */
         constexpr static const type mask = make_shifted_mask<type>(width,
                                                                    offset);
+
+        //! Boolean flag indicating if a shadow value is used.
+        constexpr static const bool has_shadow =
+            parent_register::shadow::use_shadow;
 
         //! Customized overflow check implementation for Field types.
         /**
          * @tparam value Value to be checked for overflow.
          * @return `true` if no overflow, `false` otherwise.
+         *
+         * This is only used for the template form of the write method.
          */
         template <type value>
         struct check_overflow {
@@ -84,125 +88,104 @@ namespace cppreg {
                                          >::result::value;
         };
 
-        //! Field read method.
+        //!@ Field read method.
         /**
          * @return Field value.
          */
         inline static type read() noexcept {
-            return
-                AccessPolicy::read(parent_register::ro_mem_pointer(),
-                                   mask,
-                                   offset);
+            return policy::template read<MMIO_t, type, mask, offset>(
+                parent_register::ro_mem_pointer()
+                                                                    );
         };
 
-        //! Field write method (shadow value disabled).
+        //! Field write method (no shadow value).
         /**
          * @param value Value to be written to the field.
-         *
-         * We use SFINAE to discriminate for registers with shadow value
-         * enabled.
-         *
-         * This method does not perform any check on the input value. If the
-         * input value is too large for the field size it will not overflow
-         * but only the part that fits in the field will be written.
-         * For safe write see
          */
         template <typename T = type>
         inline static void
-        write(const typename std::enable_if<
-            !parent_register::shadow::use_shadow, T
-                                           >::type value) noexcept {
-            AccessPolicy::write(parent_register::rw_mem_pointer(),
-                                mask,
-                                offset,
-                                value);
+        write(const typename std::enable_if<!has_shadow, T>::type value)
+        noexcept {
+            policy::template write<MMIO_t, type, mask, offset>(
+                parent_register::rw_mem_pointer(),
+                value
+                                                              );
         };
 
-        //! Field write method (shadow value enabled).
+        //! Field write method (w/ shadow value).
         /**
          * @param value Value to be written to the field.
-         *
-         * We use SFINAE to discriminate for registers with shadow value
-         * enabled.
-         *
-         * This method does not perform any check on the input value. If the
-         * input value is too large for the field size it will not overflow
-         * but only the part that fits in the field will be written.
-         * For safe write see
          */
         template <typename T = type>
         inline static void
-        write(const typename std::enable_if<
-            parent_register::shadow::use_shadow, T
-                                           >::type value) noexcept {
+        write(const typename std::enable_if<has_shadow, T>::type value)
+        noexcept {
 
             // Update shadow value.
-            // Fetch the whole register content.
             // This assumes that reading a write-only fields return some value.
-            parent_register::shadow::value =
-                (parent_register::shadow::value & ~mask) |
-                ((value << offset) & mask);
+            RegisterWrite<type, type, mask, offset>
+            ::write(&parent_register::shadow::value, value);
 
             // Write as a block to the register, that is, we do not use the
             // mask and offset.
-            AccessPolicy::write(parent_register::rw_mem_pointer(),
-                                ~(0u),
-                                0u,
-                                parent_register::shadow::value);
+            policy::template write<MMIO_t, type, type_mask<type>::value, 0u>(
+                parent_register::rw_mem_pointer(),
+                parent_register::shadow::value
+                                                                            );
 
         };
 
-        //! Field write method with compile-time check (shadow value disabled).
+        //! Field write method with overflow check (no shadow value).
         /**
          * @tparam value Value to be written to the field
          *
-         * We use SFINAE to discriminate for registers with shadow value
-         * enabled.
-         *
          * This method performs a compile-time check to avoid overflowing the
-         * field.
+         * field and uses the constant write implementation.
          */
         template <type value, typename T = void>
         inline static
         typename std::enable_if<
-            (!parent_register::shadow::use_shadow)
+            !has_shadow
             &&
             check_overflow<value>::result,
             T
                                >::type
         write() noexcept {
-            write(value);
+            policy::template write<MMIO_t, type, mask, offset, value>(
+                parent_register::rw_mem_pointer()
+                                                                     );
         };
 
-        //! Field write method with compile-time check (shadow value enabled).
+        //! Field write method with overflow check (w/ shadow value).
         /**
          * @tparam value Value to be written to the field
          *
-         * We use SFINAE to discriminate for registers with shadow value
-         * enabled.
-         *
          * This method performs a compile-time check to avoid overflowing the
-         * field.
+         * field and uses the constant write implementation.
          */
         template <type value, typename T = void>
         inline static
         typename std::enable_if<
-            parent_register::shadow::use_shadow
+            has_shadow
             &&
             check_overflow<value>::result,
             T
                                >::type
         write() noexcept {
-            write(value);
-        };
 
+            // For this particular we can simply forward to the non-constant
+            // implementation.
+            write(value);
+
+        };
 
         //! Field set method.
         /**
          * This method will set all bits in the field.
          */
         inline static void set() noexcept {
-            AccessPolicy::set(parent_register::rw_mem_pointer(), mask);
+            policy::template
+            set<MMIO_t, type, mask>(parent_register::rw_mem_pointer());
         };
 
         //! Field clear method.
@@ -210,7 +193,8 @@ namespace cppreg {
          * This method will clear all bits in the field.
          */
         inline static void clear() noexcept {
-            AccessPolicy::clear(parent_register::rw_mem_pointer(), mask);
+            policy::template
+            clear<MMIO_t, type, mask>(parent_register::rw_mem_pointer());
         };
 
         //! Field toggle method.
@@ -218,30 +202,23 @@ namespace cppreg {
          * This method will toggle all bits in the field.
          */
         inline static void toggle() noexcept {
-            AccessPolicy::toggle(parent_register::rw_mem_pointer(), mask);
+            policy::template
+            toggle<MMIO_t, type, mask>(parent_register::rw_mem_pointer());
         };
 
         //! Is field set bool method.
         /**
-         * @return `true` if the 1-bit field is set to 1, `false` otherwise.
-         *
-         * This is only available if the field is 1 bit wide.
+         * @return `true` if all the bits are set to 1, `false` otherwise.
          */
-        template <typename T = bool>
-        inline static typename std::enable_if<FieldWidth == 1, T>::type
-        is_set() noexcept {
-            return (Field::read() == 1u);
+        inline static bool is_set() noexcept {
+            return (Field::read() == (mask >> offset));
         };
 
         //! Is field clear bool method.
         /**
-         * @return `true` if the 1-bit field is set to 0, `false` otherwise.
-         *
-         * This is only available if the field is 1 bit wide.
+         * @return `true` if all the bits are set to 0, `false` otherwise.
          */
-        template <typename T = bool>
-        inline static typename std::enable_if<FieldWidth == 1, T>::type
-        is_clear() noexcept {
+        inline static bool is_clear() noexcept {
             return (Field::read() == 0u);
         };
         
