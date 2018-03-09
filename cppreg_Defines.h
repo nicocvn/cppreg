@@ -47,6 +47,18 @@ namespace cppreg {
     using Offset_t = std::uint8_t;
 
 
+    //! Shorthand for max value as a mask.
+    /**
+     * @tparam T Data type.
+     *
+     * This is used to define register masks.
+     */
+    template <typename T>
+    struct type_mask {
+        constexpr static const T value = std::numeric_limits<T>::max();
+    };
+
+
 }
 
 

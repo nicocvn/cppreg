@@ -6,6 +6,11 @@
  *
  * The "merge write" implementation is designed to make it possible to merge
  * write operations on different fields into a single one.
+ * The implementation distinguishes between values known at compile time and
+ * value known at run time.
+ *
+ * By design the merge write implementation forces the caller to chain and
+ * finalize all write operations in a single pass.
  */
 
 
@@ -22,12 +27,28 @@
 namespace cppreg {
 
 
-    //! Write operation holding structure.
+    //! Merge write constant implementation.
     /**
-     * @tparam Register Underlying register for the final write operation.
+     * @tparam Register Register on which the merged write will be performed.
+     * @tparam mask Initial mask.
+     * @tparam offset Initial offset.
+     * @tparam value Initial value.
+     *
+     * The initial data will come from the field on which the merge write
+     * will be initiated.
+     *
+     * This implementation is designed for operations in which all data is
+     * available at compile time. This makes it possible to leverage a
+     * template implementation and simplify most of the operations (based on
+     * the access policies implementation that detects trivial operations). In
+     * addition, this will also perform overflow checking.
      */
-    template <typename Register>
-    class MergeWrite {
+    template <
+        typename Register,
+        typename Register::type mask,
+        Offset_t offset,
+        typename Register::type value
+    > class MergeWrite_tmpl {
 
 
     public:
@@ -35,31 +56,42 @@ namespace cppreg {
         //! Type alias to register base type.
         using base_type = typename Register::type;
 
-        //! Static instantiation method.
-        static MergeWrite create_instance(const base_type value,
-                                          const base_type mask) noexcept {
-            MergeWrite mw;
-            mw._accumulated_value = value;
-            mw._combined_mask = mask;
-            return mw;
-        };
 
-        //!@ Move constructor.
-        MergeWrite(MergeWrite&& mw) noexcept
-            : _accumulated_value(mw._accumulated_value),
-              _combined_mask(mw._combined_mask) {
-        };
+    private:
 
-        //!@{ Non-copyable.
-        MergeWrite(const MergeWrite&) = delete;
-        MergeWrite& operator=(const MergeWrite&) = delete;
+        // Disabled for shadow value register.
+        static_assert(!Register::shadow::use_shadow,
+                      "merge write is not available for shadow value register");
+
+        // Accumulated value.
+        constexpr static const base_type _accumulated_value =
+            ((value << offset) & mask);
+
+        // Combined mask.
+        constexpr static const base_type _combined_mask = mask;
+
+        // Default constructor.
+        MergeWrite_tmpl() {};
+
+
+    public:
+
+        //! Instantiation method.
+        inline static MergeWrite_tmpl make() noexcept { return {}; };
+
+        //!@{ Non-copyable and non-moveable.
+        MergeWrite_tmpl(const MergeWrite_tmpl&) = delete;
+        MergeWrite_tmpl& operator=(const MergeWrite_tmpl&) = delete;
+        MergeWrite_tmpl& operator=(MergeWrite_tmpl&&) = delete;
+        MergeWrite_tmpl operator=(MergeWrite_tmpl) = delete;
+        MergeWrite_tmpl(MergeWrite_tmpl&&) = delete;
         //!@}
 
-        //! Destructor.
+        //! Closure method.
         /**
-         * This is where the write operation is performed.
+         * This is where the write happens.
          */
-        ~MergeWrite() {
+        inline void done() const && noexcept {
 
             // Get memory pointer.
             typename Register::MMIO_t* const mmio_device =
@@ -68,10 +100,111 @@ namespace cppreg {
             // Write to the whole register using the current accumulated value
             // and combined mask.
             // No offset needed because we write to the whole register.
-            *mmio_device = static_cast<base_type>(
-                (*mmio_device & ~_combined_mask) |
-                ((_accumulated_value) & _combined_mask)
-            );
+            RegisterWriteConstant<
+                typename Register::MMIO_t,
+                typename Register::type,
+                _combined_mask,
+                0u,
+                _accumulated_value
+                                 >::write(mmio_device);
+
+        };
+
+        //! With method for constant value.
+        /**
+         * @tparam F Field to be written
+         * @tparam new_value Value to write to the field.
+         * @return A new instance for chaining other write operations.
+         */
+        template <
+            typename F,
+            base_type new_value,
+            typename T = MergeWrite_tmpl<
+                Register,
+                (_combined_mask | F::mask),
+                0u,
+                (_accumulated_value & ~F::mask) | ((new_value << F::offset) &
+                                                   F::mask)
+                                        >
+        >
+        inline
+        typename std::enable_if<
+            (internals::check_overflow<
+                Register::size, new_value, (F::mask >> F::offset)
+                                      >::result::value),
+            T
+                               >::type&&
+        with() const && noexcept {
+            return std::move(T::make());
+        };
+
+
+    };
+
+
+    //! Merge write implementation.
+    /**
+     * @tparam Register Register on which the merged write will be performed.
+     * @tparam mask Initial mask.
+     *
+     * The initial mask will come from the field on which the merge write
+     * will be initiated.
+     */
+    template <
+        typename Register,
+        typename Register::type mask
+    >
+    class MergeWrite {
+
+
+    public:
+
+        //! Type alias to register base type.
+        using base_type = typename Register::type;
+
+
+    private:
+
+        // Combined mask.
+        constexpr static const base_type _combined_mask = mask;
+
+
+    public:
+
+        //! Static instantiation method.
+        constexpr static MergeWrite make(const base_type value) noexcept {
+            return MergeWrite(value);
+        };
+
+        //!@ Move constructor.
+        MergeWrite(MergeWrite&& mw) noexcept
+        : _accumulated_value(mw._accumulated_value) {};
+
+        //!@{ Non-copyable.
+        MergeWrite(const MergeWrite&) = delete;
+        MergeWrite& operator=(const MergeWrite&) = delete;
+        MergeWrite& operator=(MergeWrite&&) = delete;
+        //!@}
+
+        //! Closure method.
+        /**
+         * This is where the write happens.
+         */
+        inline void done() const && noexcept {
+
+            // Get memory pointer.
+            typename Register::MMIO_t* const mmio_device =
+                Register::rw_mem_pointer();
+
+            // Write to the whole register using the current accumulated value
+            // and combined mask.
+            // No offset needed because we write to the whole register.
+            RegisterWrite<
+                typename Register::MMIO_t,
+                base_type,
+                _combined_mask,
+                0u
+                         >::write(mmio_device, _accumulated_value);
 
         };
 
@@ -80,12 +213,10 @@ namespace cppreg {
          * @tparam F Field type describing where to write in the register.
          * @param value Value to write to the register.
          * @return A reference to the current merge write data.
-         *
-         * This method is used to add another operation to the final merged
-         * write.
          */
         template <typename F>
-        MergeWrite&& with(const base_type value) && noexcept {
+        inline MergeWrite<Register, _combined_mask | F::mask> with
+            (const base_type value) && noexcept {
 
             // Check that the field belongs to the register.
             static_assert(std::is_same<
@@ -95,43 +226,19 @@ namespace cppreg {
                           "field is not from the same register in merge_write");
 
             // Update accumulated value.
-            F::policy::write(&_accumulated_value,
-                             F::mask,
-                             F::offset,
-                             value);
+            F::policy::template write<
+                base_type,
+                base_type,
+                F::mask,
+                F::offset
+                                     >(&_accumulated_value, value);
 
-            // Update combine mask.
-            _combined_mask = _combined_mask | F::mask;
+            return
+                std::move(
+                    MergeWrite<Register, (_combined_mask | F::mask)>
+                    ::make(_accumulated_value)
+                         );
 
-            return std::move(*this);
-
-        };
-
-        //! With method with compile-time check.
-        /**
-         * @tparam F Field type describing where to write in the register.
-         * @param value Value to write to the register.
-         * @return A reference to the current merge write data.
-         *
-         * This method is used to add another operation to the final merged
-         * write.
-         *
-         * This method performs a compile-time check to avoid overflowing the
-         * field.
-         */
-        template <
-            typename F,
-            base_type value,
-            typename T = MergeWrite
-        >
-        typename std::enable_if<
-            (internals::check_overflow<
-                Register::size, value, (F::mask >> F::offset)
-                                      >::result::value),
-            T
-                               >::type&&
-        with() && noexcept {
-            return std::move(*this).template with<F>(value);
         };
 
 
@@ -142,14 +249,11 @@ namespace cppreg {
                       "merge write is not available for shadow value register");
 
         // Private default constructor.
-        MergeWrite() : _accumulated_value(0u),
-                       _combined_mask(0u) {};
+        constexpr MergeWrite() : _accumulated_value(0u) {};
+        constexpr MergeWrite(const base_type v) : _accumulated_value(v) {};
 
         // Accumulated value.
         base_type _accumulated_value;
-
-        // Combined mask.
-        base_type _combined_mask;
 
 
     };
