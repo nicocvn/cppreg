@@ -7,6 +7,7 @@ Copyright Sendyne Corp., 2010-2018. All rights reserved ([LICENSE](LICENSE)).
 
 * expressive syntax which shows the intent of the code when dealing with registers and fields,
 * efficiency and performance on par with traditional C implementations (*e.g.*, CMSIS C code) when *at least some compiler optimizations* are enabled,
+* [huge emphasis](Performance.md) on ensuring the assembly is the same if not better than CMSIS versions,
 * field access policies (*e.g.*, read-only vs read-write) detect ill-defined access at compile-time,
 * compile-time detection of overflow,
 * easily extendable to support, for example, mock-up.
