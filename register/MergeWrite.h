@@ -60,7 +60,7 @@ namespace cppreg {
     private:
 
         // Disabled for shadow value register.
-        static_assert(!Register::shadow::use_shadow,
+        static_assert(!Register::shadow::value,
                       "merge write is not available for shadow value register");
 
         // Accumulated value.
@@ -245,7 +245,7 @@ namespace cppreg {
     private:
 
         // Disabled for shadow value register.
-        static_assert(!Register::shadow::use_shadow,
+        static_assert(!Register::shadow::value,
                       "merge write is not available for shadow value register");
 
         // Private default constructor.

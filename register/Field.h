@@ -69,7 +69,7 @@ namespace cppreg {
 
         //! Boolean flag indicating if a shadow value is used.
         constexpr static const bool has_shadow =
-            parent_register::shadow::use_shadow;
+            parent_register::shadow::value;
 
         //! Customized overflow check implementation for Field types.
         /**
@@ -124,13 +124,13 @@ namespace cppreg {
             // Update shadow value.
             // This assumes that reading a write-only fields return some value.
             RegisterWrite<type, type, mask, offset>
-            ::write(&parent_register::shadow::value, value);
+            ::write(&parent_register::shadow::shadow_value, value);
 
             // Write as a block to the register, that is, we do not use the
             // mask and offset.
             policy::template write<MMIO_t, type, type_mask<type>::value, 0u>(
                 parent_register::rw_mem_pointer(),
-                parent_register::shadow::value
+                parent_register::shadow::shadow_value
                                                                             );
 
         };
