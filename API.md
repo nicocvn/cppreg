@@ -103,7 +103,7 @@ PeripheralRegister::Frequency::write(0x10u);
 
 to clear the `Frequency` register and then write `0x10` to it.
 
-As the last example suggests, any `Field`-based type must defines its access policy (the last template parameter). Depending on the access policy various static methods are available (or not) to perform read and write operations.
+As the last example suggests, any `Field`-based type must define its access policy (the last template parameter). Depending on the access policy various static methods are available (or not) to perform read and write operations.
 
 ### Access policy ###
 The last template parameter of a `Field`-based type describes the access policy of the field. Three access policies are available: 
@@ -121,6 +121,8 @@ Depending on the access policy, the `Field`-based type will provide accessors an
 | `set()`       | YES       | NO        | NO        | set all the bits of the field to `1`                  |
 | `clear()`     | YES       | NO        | NO        | clear all the bits of the field (*i.e.*, set to `0`)  |
 | `toggle()`    | YES       | NO        | NO        | toggle all the bits of the field                      |
+| `is_set()`    | YES       | NO        | NO        | `true` is all bits set to 1                           |
+| `is_clear()`  | YES       | NO        | NO        | `true` is all bits set to 0                           |
 
 Any attempt at calling an access method which is not provided by a given policy will result in a compilation error. This is one of the mechanism used by `cppreg` to provide safety when accessing registers and fields.
 
@@ -148,16 +150,22 @@ const auto mode = PeripheralRegister::Mode::read();
 PeripheralRegister::Mode::write(0xA);
 ```
 
-### 1-bit addons ###
-`Field`-based type which are 1-bit wide and readable (`read_write` or `read_only`) have two additional methods:
+### Constant value and overflow check ###
+When performing write operations for any `Field`-based type, `cppreg` distinguishes between constant values (known at compile time) and non-constant values:
 
-* `is_set` returns `true` if the single bit is equal to `1` (false otherwise),
-* `is_clear` returns `true` if the single bit is equal to `0` (false otherwise).
+```c++
+SomeField::write<0xAB>();       // Template version for constant value write.
+SomeField::write(0xAB);         // Function argument function.
+```
 
-### Overflow check ###
-For writable `Field`-based types overflow will be prevented at runtime: only the bits part of the `Field`-type will be written and any data that does not fit the region of the memory device assigned to the `Field`-type will not be modified. This prevents overflow at runtime. But `cppreg` can also prevent overflow at compile time.
+The advantages of using the constant value version are:
 
-If the value to be written is known at compile time (which is often the case when dealing with hardware registers) one can use a template version of the `write` method. The template version does perform a check at compile time to ensure that the value to be written does not overflow:
+* `cppreg` will (most of the time) use a faster implementation for the write operation,
+* a compile-time error will occur if the value overflow the field.
+
+**Recommendation:** use the constant value version whenever it is possible.
+
+Note that, even when using the non-constant value version overflow will not occur: only the bits part of the `Field`-type will be written and any data that does not fit the region of the memory device assigned to the `Field`-type will not be modified:
 
 ```c++
 // Register definition with nested fields definitions.
@@ -175,8 +183,6 @@ PeripheralRegister::Frequency::write(0x111);    // But this will only write 0x11
 // This call does perform a compile-time check for overflow and will not compile:
 PeripheralRegister::Frequency::write<0x111>();
 ```
-
-It strongly recommended to use the template version when the value is known at compile time.
 
 
 ## Shadow value: a workaround for write-only fields ##
@@ -276,13 +282,16 @@ For this kind of situation a *merge write* mechanism was implemented in `cppreg`
 
 ```c++
 // Write to both ProtectionError and CommandComplete.
-FlashCtrl::merge_write<FlashCtrl::ProtectionError>(1).with<FlashCtrl::CommandComplete>(0);
+FlashCtrl::merge_write<FlashCtrl::ProtectionError, 0x1>().with<FlashCtrl::CommandComplete, 0x0>().done();
 
 // This will correspond to write with a mask set to 1001 0000,
 // which boils down to write (at the register level): 
 // 0000 XXXX | 0001 0000 = 0001 XXXX ... CommandComplete is not set to 1 !
 ```
 
-The `merge_write` method is only available in `Register`-based type that do not enable the shadow value mechanism. The `Field`-based types used in the chained call are required to *be from* the `Register` type used to call `merge_write`. In addition, the `Field`-types are also required to be writable.
+The `merge_write` method is only available in `Register`-based type that do not enable the shadow value mechanism. The `Field`-based types used in the chained call are required to *be from* the `Register` type used to call `merge_write`. In addition, the `Field`-types are also required to be writable. By design, the successive write operations have to be chained, that is, it is not possible to capture a merged write context and add other write operations to it; it always has to be of the form: `register::merge_write<field1, xxx>().with<field2, xxx>(). ... .done()`.
 
-Finally, it is possible to use a template form when writing merge write operations to perform overflow checking at compile time (similar to `write(value)/write<value>()` methods).
+**Warning:** if`done()` is not called at the end of the successive write operations no write at all will be performed.
+
+Similarly to regular write operations it is recommended to use the template version (as shown in the example) if possible: this will enable overflow checking and possibly use faster write implementations. If not possible the values to be written are passed as arguments to the various methods.
+

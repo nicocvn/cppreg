@@ -103,8 +103,8 @@ Peripheral::Enable::clear();
 
 A few remarks:
 
-* in the `write` calls we can also use `write(value)` instead of `write<value>()`; the latter only exists if `value` is `constexpr` (*i.e.*, known at compile time) but the benefits is that it will check for overflow at compile time,
-* 1-bit wide `Field`-based type have `is_set` and `is_clear` defined to conveniently query their states.
+* in the `write` calls we can also use `write(value)` instead of `write<value>()`; the latter only exists if `value` is `constexpr` (*i.e.*, known at compile time) but the benefits are that it will check for overflow at compile time and possibly use a faster implementation,
+* `Field`-based types have `is_set` and `is_clear` defined to conveniently query their states.
 
 The advantage of `cppreg` is that it limits the possibility of errors (see the [API documentation](API.md) for more details):
 
