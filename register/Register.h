@@ -62,18 +62,18 @@ namespace cppreg {
 
         //! Memory modifier.
         /**
-         * @return A pointer to the writable register memory.
+         * @return A reference to the writable register memory.
          */
-        static MMIO_t* rw_mem_pointer() {
-            return reinterpret_cast<MMIO_t* const>(base_address);
+        static MMIO_t& rw_mem_device() {
+            return *(reinterpret_cast<MMIO_t* const>(base_address));
         };
 
         //! Memory accessor.
         /**
-         * @return A pointer to the read-only register memory.
+         * @return A reference to the read-only register memory.
          */
-        static const MMIO_t* ro_mem_pointer() {
-            return reinterpret_cast<const MMIO_t* const>(base_address);
+        static const MMIO_t& ro_mem_device() {
+            return *(reinterpret_cast<const MMIO_t* const>(base_address));
         };
 
         //! Merge write start function.

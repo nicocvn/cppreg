@@ -94,8 +94,8 @@ namespace cppreg {
         inline void done() const && noexcept {
 
             // Get memory pointer.
-            typename Register::MMIO_t* const mmio_device =
-                Register::rw_mem_pointer();
+            typename Register::MMIO_t& mmio_device =
+                Register::rw_mem_device();
 
             // Write to the whole register using the current accumulated value
             // and combined mask.
@@ -193,8 +193,8 @@ namespace cppreg {
         inline void done() const && noexcept {
 
             // Get memory pointer.
-            typename Register::MMIO_t* const mmio_device =
-                Register::rw_mem_pointer();
+            typename Register::MMIO_t& mmio_device =
+                Register::rw_mem_device();
 
             // Write to the whole register using the current accumulated value
             // and combined mask.
@@ -231,7 +231,7 @@ namespace cppreg {
                 base_type,
                 F::mask,
                 F::offset
-                                     >(&_accumulated_value, value);
+                                     >(_accumulated_value, value);
 
             return
                 std::move(

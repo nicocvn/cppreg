@@ -94,7 +94,7 @@ namespace cppreg {
          */
         inline static type read() noexcept {
             return policy::template read<MMIO_t, type, mask, offset>(
-                parent_register::ro_mem_pointer()
+                parent_register::ro_mem_device()
                                                                     );
         };
 
@@ -107,7 +107,7 @@ namespace cppreg {
         write(const typename std::enable_if<!has_shadow, T>::type value)
         noexcept {
             policy::template write<MMIO_t, type, mask, offset>(
-                parent_register::rw_mem_pointer(),
+                parent_register::rw_mem_device(),
                 value
                                                               );
         };
@@ -124,12 +124,12 @@ namespace cppreg {
             // Update shadow value.
             // This assumes that reading a write-only fields return some value.
             RegisterWrite<type, type, mask, offset>
-            ::write(&parent_register::shadow::shadow_value, value);
+            ::write(parent_register::shadow::shadow_value, value);
 
             // Write as a block to the register, that is, we do not use the
             // mask and offset.
             policy::template write<MMIO_t, type, type_mask<type>::value, 0u>(
-                parent_register::rw_mem_pointer(),
+                parent_register::rw_mem_device(),
                 parent_register::shadow::shadow_value
                                                                             );
 
@@ -152,7 +152,7 @@ namespace cppreg {
                                >::type
         write() noexcept {
             policy::template write<MMIO_t, type, mask, offset, value>(
-                parent_register::rw_mem_pointer()
+                parent_register::rw_mem_device()
                                                                      );
         };
 
@@ -185,7 +185,7 @@ namespace cppreg {
          */
         inline static void set() noexcept {
             policy::template
-            set<MMIO_t, type, mask>(parent_register::rw_mem_pointer());
+            set<MMIO_t, type, mask>(parent_register::rw_mem_device());
         };
 
         //! Field clear method.
@@ -194,7 +194,7 @@ namespace cppreg {
          */
         inline static void clear() noexcept {
             policy::template
-            clear<MMIO_t, type, mask>(parent_register::rw_mem_pointer());
+            clear<MMIO_t, type, mask>(parent_register::rw_mem_device());
         };
 
         //! Field toggle method.
@@ -203,7 +203,7 @@ namespace cppreg {
          */
         inline static void toggle() noexcept {
             policy::template
-            toggle<MMIO_t, type, mask>(parent_register::rw_mem_pointer());
+            toggle<MMIO_t, type, mask>(parent_register::rw_mem_device());
         };
 
         //! Is field set bool method.
