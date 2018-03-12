@@ -34,17 +34,17 @@ namespace cppreg {
             (mask == type_mask<T>::value) && (offset == 0u);
         template <typename U = void>
         inline static T read(
-            const MMIO_t* const mmio_device,
+            const MMIO_t& mmio_device,
             typename std::enable_if<!is_trivial, U*>::type = nullptr
                             ) noexcept {
-            return static_cast<T>((*mmio_device & mask) >> offset);
+            return static_cast<T>((mmio_device & mask) >> offset);
         };
         template <typename U = void>
         inline static T read(
-            const MMIO_t* const mmio_device,
+            const MMIO_t& mmio_device,
             typename std::enable_if<is_trivial, U*>::type = nullptr
                             ) noexcept {
-            return static_cast<T>(*mmio_device);
+            return static_cast<T>(mmio_device);
         };
     };
     template <typename MMIO_t, typename T, T mask, Offset_t offset>
@@ -53,21 +53,21 @@ namespace cppreg {
             (mask == type_mask<T>::value) && (offset == 0u);
         template <typename U = void>
         inline static void write(
-            MMIO_t* const mmio_device,
+            MMIO_t& mmio_device,
             T value,
             typename std::enable_if<!is_trivial, U*>::type = nullptr
                                 ) noexcept {
-            *mmio_device = static_cast<T>(
-                (*mmio_device & ~mask) | ((value << offset) & mask)
+            mmio_device = static_cast<T>(
+                (mmio_device & ~mask) | ((value << offset) & mask)
             );
         };
         template <typename U = void>
         inline static void write(
-            MMIO_t* const mmio_device,
+            MMIO_t& mmio_device,
             T value,
             typename std::enable_if<is_trivial, U*>::type = nullptr
                                 ) noexcept {
-            *mmio_device = value;
+            mmio_device = value;
         };
     };
     template <typename MMIO_t, typename T, T mask, Offset_t offset, T value>
@@ -76,66 +76,66 @@ namespace cppreg {
             (mask == type_mask<T>::value) && (offset == 0u);
         template <typename U = void>
         inline static void write(
-            MMIO_t* const mmio_device,
+            MMIO_t& mmio_device,
             typename std::enable_if<!is_trivial, U*>::type = nullptr
                                 ) noexcept {
-            *mmio_device = static_cast<T>(
-                (*mmio_device & ~mask) | ((value << offset) & mask)
+            mmio_device = static_cast<T>(
+                (mmio_device & ~mask) | ((value << offset) & mask)
             );
         };
         template <typename U = void>
         inline static void write(
-            MMIO_t* const mmio_device,
+            MMIO_t& mmio_device,
             typename std::enable_if<is_trivial, U*>::type = nullptr
                              ) noexcept {
-            *mmio_device = value;
+            mmio_device = value;
         };
     };
     struct read_only {
         template <typename MMIO_t, typename T, T mask, Offset_t offset>
-        inline static T read(const MMIO_t* const mmio_device) noexcept {
+        inline static T read(const MMIO_t& mmio_device) noexcept {
             return RegisterRead<MMIO_t, T, mask, offset>::read(mmio_device);
         };
     };
     struct read_write : read_only {
         template <typename MMIO_t, typename T, T mask, Offset_t offset>
-        inline static void write(MMIO_t* const mmio_device,
+        inline static void write(MMIO_t& mmio_device,
                                  const T value) noexcept {
             RegisterWrite<MMIO_t, T, mask, offset>::write(mmio_device, value);
         };
         template <typename MMIO_t, typename T, T mask, Offset_t offset, T value>
-        inline static void write(MMIO_t* const mmio_device) noexcept {
+        inline static void write(MMIO_t& mmio_device) noexcept {
             RegisterWriteConstant<MMIO_t, T, mask, offset, value>
             ::write(mmio_device);
         };
         template <typename MMIO_t, typename T, T mask>
-        inline static void set(MMIO_t* const mmio_device)
+        inline static void set(MMIO_t& mmio_device)
         noexcept {
             RegisterWriteConstant<MMIO_t, T, mask, 0u, mask>
             ::write(mmio_device);
         };
         template <typename MMIO_t, typename T, T mask>
-        inline static void clear(MMIO_t* const mmio_device)
+        inline static void clear(MMIO_t& mmio_device)
         noexcept {
             RegisterWriteConstant<MMIO_t, T, mask, 0u, ~mask>
             ::write(mmio_device);
         };
         template <typename MMIO_t, typename T, T mask>
-        inline static void toggle(MMIO_t* const mmio_device)
+        inline static void toggle(MMIO_t& mmio_device)
         noexcept {
-            *mmio_device = static_cast<T>((*mmio_device) ^ mask);
+            mmio_device = static_cast<T>((mmio_device) ^ mask);
         };
     };
     struct write_only {
         template <typename MMIO_t, typename T, T mask, Offset_t offset>
-        inline static void write(MMIO_t* const mmio_device,
+        inline static void write(MMIO_t& mmio_device,
                                  const T value) noexcept {
             RegisterWrite<MMIO_t, T, type_mask<T>::value, 0u>::write(
                 mmio_device, ((value << offset) & mask)
                                                                     );
         };
         template <typename MMIO_t, typename T, T mask, Offset_t offset, T value>
-        inline static void write(MMIO_t* const mmio_device) noexcept {
+        inline static void write(MMIO_t& mmio_device) noexcept {
             RegisterWriteConstant<
                 MMIO_t, T, type_mask<T>::value, 0u, ((value << offset) & mask)
                                  >
@@ -200,20 +200,14 @@ namespace cppreg {
 #ifndef CPPREG_SHADOWVALUE_H
 #define CPPREG_SHADOWVALUE_H
 namespace cppreg {
-    template <typename Register, bool UseShadow>
-    struct Shadow {
-        constexpr static const bool use_shadow = false;
+    template <typename Register, bool UseShadow> struct Shadow : std::false_type {};
+    template <typename Register>
+    struct Shadow<Register, true> : std::true_type {
+        static typename Register::type shadow_value;
     };
     template <typename Register>
-    struct Shadow<Register, true> {
-        static typename Register::type value;
-        constexpr static const bool use_shadow = true;
-    };
-    template <typename Register>
-    typename Register::type Shadow<Register, true>::value =
+    typename Register::type Shadow<Register, true>::shadow_value =
         Register::reset;
-    template <typename Register>
-    constexpr const bool Shadow<Register, true>::use_shadow;
 }
 #endif  
 
@@ -230,7 +224,7 @@ namespace cppreg {
     public:
         using base_type = typename Register::type;
     private:
-        static_assert(!Register::shadow::use_shadow,
+        static_assert(!Register::shadow::value,
                       "merge write is not available for shadow value register");
         constexpr static const base_type _accumulated_value =
             ((value << offset) & mask);
@@ -244,8 +238,8 @@ namespace cppreg {
         MergeWrite_tmpl operator=(MergeWrite_tmpl) = delete;
         MergeWrite_tmpl(MergeWrite_tmpl&&) = delete;
         inline void done() const && noexcept {
-            typename Register::MMIO_t* const mmio_device =
-                Register::rw_mem_pointer();
+            typename Register::MMIO_t& mmio_device =
+                Register::rw_mem_device();
             RegisterWriteConstant<
                 typename Register::MMIO_t,
                 typename Register::type,
@@ -295,8 +289,8 @@ namespace cppreg {
         MergeWrite& operator=(const MergeWrite&) = delete;
         MergeWrite& operator=(MergeWrite&&) = delete;
         inline void done() const && noexcept {
-            typename Register::MMIO_t* const mmio_device =
-                Register::rw_mem_pointer();
+            typename Register::MMIO_t& mmio_device =
+                Register::rw_mem_device();
             RegisterWrite<
                 typename Register::MMIO_t,
                 base_type,
@@ -317,7 +311,7 @@ namespace cppreg {
                 base_type,
                 F::mask,
                 F::offset
-                                     >(&_accumulated_value, value);
+                                     >(_accumulated_value, value);
             return
                 std::move(
                     MergeWrite<Register, (_combined_mask | F::mask)>
@@ -325,7 +319,7 @@ namespace cppreg {
                          );
         };
     private:
-        static_assert(!Register::shadow::use_shadow,
+        static_assert(!Register::shadow::value,
                       "merge write is not available for shadow value register");
         constexpr MergeWrite() : _accumulated_value(0u) {};
         constexpr MergeWrite(const base_type v) : _accumulated_value(v) {};
@@ -351,11 +345,11 @@ namespace cppreg {
         constexpr static const Width_t size = RegWidth;
         constexpr static const type reset = ResetValue;
         using shadow = Shadow<Register, UseShadow>;
-        static MMIO_t* rw_mem_pointer() {
-            return reinterpret_cast<MMIO_t* const>(base_address);
+        static MMIO_t& rw_mem_device() {
+            return *(reinterpret_cast<MMIO_t* const>(base_address));
         };
-        static const MMIO_t* ro_mem_pointer() {
-            return reinterpret_cast<const MMIO_t* const>(base_address);
+        static const MMIO_t& ro_mem_device() {
+            return *(reinterpret_cast<const MMIO_t* const>(base_address));
         };
         template <typename F>
         inline static MergeWrite<typename F::parent_register, F::mask>
@@ -387,6 +381,53 @@ namespace cppreg {
         static_assert(RegWidth != 0u,
                       "defining a Register type of width 0u is not allowed");
     };
+    template <
+        Address_t PackBase,
+        std::uint32_t PackByteSize
+    > struct RegisterPack {
+        using mem_array_t = std::array<volatile std::uint8_t, PackByteSize>;
+        constexpr static const Address_t pack_base = PackBase;
+        constexpr static const std::uint32_t size_in_bytes = PackByteSize;
+        static mem_array_t& _mem_array;
+    };
+    template <
+        Address_t PackBase,
+        std::uint32_t PackByteSize
+    >
+    typename RegisterPack<PackBase, PackByteSize>::mem_array_t&
+        RegisterPack<PackBase, PackByteSize>::_mem_array =
+        *(
+            reinterpret_cast<
+                RegisterPack<PackBase, PackByteSize>::mem_array_t* const
+                >(RegisterPack<PackBase, PackByteSize>::pack_base)
+        );
+    template <
+        typename RegisterPack,
+        Width_t RegWidth,
+        std::uint32_t OffsetInPack
+    >
+    struct PackedRegister :
+    Register<RegisterPack::pack_base + OffsetInPack * 8, RegWidth> {
+        using base_reg = Register<
+            RegisterPack::pack_base + OffsetInPack * 8, RegWidth
+                                 >;
+        static typename base_reg::MMIO_t& rw_mem_device() {
+            return RegisterPack::_mem_array[OffsetInPack];
+        };
+        static const typename base_reg::MMIO_t& ro_mem_device() {
+            return RegisterPack::_mem_array[OffsetInPack];
+        };
+        static_assert((OffsetInPack + (RegWidth / 8u)) <=
+                      RegisterPack::size_in_bytes,
+                      "packed register is overflowing the pack");
+    };
+    template <typename... Regs>
+    struct PackIndexing {
+        template <std::size_t N>
+        using type = typename std::tuple_element<N, std::tuple<Regs...>>::type;
+        template <std::size_t N>
+        using regs = typename std::tuple_element<N, std::tuple<Regs...>>::type;
+    };
 }
 #endif  
 
@@ -410,7 +451,7 @@ namespace cppreg {
         constexpr static const type mask = make_shifted_mask<type>(width,
                                                                    offset);
         constexpr static const bool has_shadow =
-            parent_register::shadow::use_shadow;
+            parent_register::shadow::value;
         template <type value>
         struct check_overflow {
             constexpr static const bool result =
@@ -422,7 +463,7 @@ namespace cppreg {
         };
         inline static type read() noexcept {
             return policy::template read<MMIO_t, type, mask, offset>(
-                parent_register::ro_mem_pointer()
+                parent_register::ro_mem_device()
                                                                     );
         };
         template <typename T = type>
@@ -430,7 +471,7 @@ namespace cppreg {
         write(const typename std::enable_if<!has_shadow, T>::type value)
         noexcept {
             policy::template write<MMIO_t, type, mask, offset>(
-                parent_register::rw_mem_pointer(),
+                parent_register::rw_mem_device(),
                 value
                                                               );
         };
@@ -439,10 +480,10 @@ namespace cppreg {
         write(const typename std::enable_if<has_shadow, T>::type value)
         noexcept {
             RegisterWrite<type, type, mask, offset>
-            ::write(&parent_register::shadow::value, value);
+            ::write(parent_register::shadow::shadow_value, value);
             policy::template write<MMIO_t, type, type_mask<type>::value, 0u>(
-                parent_register::rw_mem_pointer(),
-                parent_register::shadow::value
+                parent_register::rw_mem_device(),
+                parent_register::shadow::shadow_value
                                                                             );
         };
         template <type value, typename T = void>
@@ -455,7 +496,7 @@ namespace cppreg {
                                >::type
         write() noexcept {
             policy::template write<MMIO_t, type, mask, offset, value>(
-                parent_register::rw_mem_pointer()
+                parent_register::rw_mem_device()
                                                                      );
         };
         template <type value, typename T = void>
@@ -471,15 +512,15 @@ namespace cppreg {
         };
         inline static void set() noexcept {
             policy::template
-            set<MMIO_t, type, mask>(parent_register::rw_mem_pointer());
+            set<MMIO_t, type, mask>(parent_register::rw_mem_device());
         };
         inline static void clear() noexcept {
             policy::template
-            clear<MMIO_t, type, mask>(parent_register::rw_mem_pointer());
+            clear<MMIO_t, type, mask>(parent_register::rw_mem_device());
         };
         inline static void toggle() noexcept {
             policy::template
-            toggle<MMIO_t, type, mask>(parent_register::rw_mem_pointer());
+            toggle<MMIO_t, type, mask>(parent_register::rw_mem_device());
         };
         inline static bool is_set() noexcept {
             return (Field::read() == (mask >> offset));
