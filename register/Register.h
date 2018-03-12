@@ -165,16 +165,38 @@ namespace cppreg {
         );
 
 
+    //! Packed register implementation.
+    /**
+     * @tparam RegisterPack Pack to which the register belongs.
+     * @tparam RegWidth Register total width in bits.
+     * @tparam OffsetInPack Register offset in the pack in bytes.
+     * @tparam reset Register reset value (0x0 if unknown).
+     * @tparam shadow Boolean flag to enable shadow value (enabled if `true`).
+     *
+     * This implementation is intended to be used when defining a register
+     * that belongs to a type.
+     */
     template <
         typename RegisterPack,
         Width_t RegWidth,
-        std::uint32_t OffsetInPack
+        std::uint32_t OffsetInPack,
+        typename RegisterType<RegWidth>::type ResetValue = 0x0,
+        bool UseShadow = false
     >
     struct PackedRegister :
-    Register<RegisterPack::pack_base + OffsetInPack * 8, RegWidth> {
+    Register<
+        RegisterPack::pack_base + OffsetInPack * 8,
+        RegWidth,
+        ResetValue,
+        UseShadow
+            > {
 
+        //! Register type.
         using base_reg = Register<
-            RegisterPack::pack_base + OffsetInPack * 8, RegWidth
+            RegisterPack::pack_base + OffsetInPack * 8,
+            RegWidth,
+            ResetValue,
+            UseShadow
                                  >;
 
         //! Memory modifier.
@@ -201,18 +223,22 @@ namespace cppreg {
     };
 
 
-    template <typename... Regs>
+    //! Pack indexing structure.
+    /**
+     * @tparam T List of types (registers or fields) to index.
+     *
+     * This can be used to conveniently map indices over packed registers.
+     * The order in the variadic parameter pack will define the indexing
+     * (starting at zero).
+     */
+    template <typename... T>
     struct PackIndexing {
         template <std::size_t N>
-        using type = typename std::tuple_element<N, std::tuple<Regs...>>::type;
-        template <std::size_t N>
-        using regs = typename std::tuple_element<N, std::tuple<Regs...>>::type;
+        using regs = typename std::tuple_element<N, std::tuple<T...>>::type;
     };
+
 
 }
 
 
 #endif  // CPPREG_REGISTER_H
-
-
-
