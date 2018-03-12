@@ -124,6 +124,91 @@ namespace cppreg {
     };
 
 
+    //! Register pack base implementation.
+    /**
+     * @tparam PackBase Base address to use for the pack memory.
+     * @tparam PackByteSize Size in bytes of the memory region for the pack.
+     */
+    template <
+        Address_t PackBase,
+        std::uint32_t PackByteSize
+    > struct RegisterPack {
+
+        //! Type alias for byte array.
+        using mem_array_t = std::array<volatile std::uint8_t, PackByteSize>;
+
+        //! Base address.
+        constexpr static const Address_t pack_base = PackBase;
+
+        //! Pack size in bytes.
+        constexpr static const std::uint32_t size_in_bytes = PackByteSize;
+
+        //! Reference to the byte array.
+        /**
+         * This is explicitly defined below.
+         */
+        static mem_array_t& _mem_array;
+
+    };
+
+    //! RegisterPack byte array reference definition.
+    template <
+        Address_t PackBase,
+        std::uint32_t PackByteSize
+    >
+    typename RegisterPack<PackBase, PackByteSize>::mem_array_t&
+        RegisterPack<PackBase, PackByteSize>::_mem_array =
+        *(
+            reinterpret_cast<
+                RegisterPack<PackBase, PackByteSize>::mem_array_t* const
+                >(RegisterPack<PackBase, PackByteSize>::pack_base)
+        );
+
+
+    template <
+        typename RegisterPack,
+        Width_t RegWidth,
+        std::uint32_t OffsetInPack
+    >
+    struct PackedRegister :
+    Register<RegisterPack::pack_base + OffsetInPack * 8, RegWidth> {
+
+        using base_reg = Register<
+            RegisterPack::pack_base + OffsetInPack * 8, RegWidth
+                                 >;
+
+        //! Memory modifier.
+        /**
+         * @return A reference to the writable register memory.
+         */
+        static typename base_reg::MMIO_t& rw_mem_device() {
+            return RegisterPack::_mem_array[OffsetInPack];
+        };
+
+        //! Memory accessor.
+        /**
+         * @return A reference to the read-only register memory.
+         */
+        static const typename base_reg::MMIO_t& ro_mem_device() {
+            return RegisterPack::_mem_array[OffsetInPack];
+        };
+
+        // Safety check to detect if are overflowing the pack.
+        static_assert((OffsetInPack + (RegWidth / 8u)) <=
+                      RegisterPack::size_in_bytes,
+                      "packed register is overflowing the pack");
+
+    };
+
+
+    template <typename... Regs>
+    struct PackIndexing {
+        template <std::size_t N>
+        using type = typename std::tuple_element<N, std::tuple<Regs...>>::type;
+        template <std::size_t N>
+        using regs = typename std::tuple_element<N, std::tuple<Regs...>>::type;
+    };
+
 }
 
 

@@ -12,6 +12,7 @@
 
 #include <cstdint>
 #include <limits>
+#include <tuple>
 
 
 #endif  // CPPREG_CPPREG_INCLUDES_H
