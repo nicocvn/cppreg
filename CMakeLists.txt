@@ -25,6 +25,7 @@ set(CPPREG_API_HEADERS
     register/Mask.h
     register/Overflow.h
     register/Register.h
+    register/RegisterPack.h
     register/ShadowValue.h
     register/Traits.h)
 

@@ -381,6 +381,13 @@ namespace cppreg {
         static_assert(RegWidth != 0u,
                       "defining a Register type of width 0u is not allowed");
     };
+}
+#endif  
+
+// RegisterPack.h
+#ifndef CPPREG_REGISTERPACK_H
+#define CPPREG_REGISTERPACK_H
+namespace cppreg {
     template <
         Address_t PackBase,
         std::uint32_t PackByteSize
@@ -404,12 +411,22 @@ namespace cppreg {
     template <
         typename RegisterPack,
         Width_t RegWidth,
-        std::uint32_t OffsetInPack
+        std::uint32_t OffsetInPack,
+        typename RegisterType<RegWidth>::type ResetValue = 0x0,
+        bool UseShadow = false
     >
     struct PackedRegister :
-    Register<RegisterPack::pack_base + OffsetInPack * 8, RegWidth> {
+        Register<
+            RegisterPack::pack_base + OffsetInPack * 8,
+            RegWidth,
+            ResetValue,
+            UseShadow
+                > {
         using base_reg = Register<
-            RegisterPack::pack_base + OffsetInPack * 8, RegWidth
+            RegisterPack::pack_base + OffsetInPack * 8,
+            RegWidth,
+            ResetValue,
+            UseShadow
                                  >;
         static typename base_reg::MMIO_t& rw_mem_device() {
             return RegisterPack::_mem_array[OffsetInPack];
@@ -421,12 +438,25 @@ namespace cppreg {
                       RegisterPack::size_in_bytes,
                       "packed register is overflowing the pack");
     };
-    template <typename... Regs>
+    template <typename... T>
     struct PackIndexing {
         template <std::size_t N>
-        using type = typename std::tuple_element<N, std::tuple<Regs...>>::type;
-        template <std::size_t N>
-        using regs = typename std::tuple_element<N, std::tuple<Regs...>>::type;
+        using regs = typename std::tuple_element<N, std::tuple<T...>>::type;
+    };
+    template <std::size_t start, std::size_t end>
+    struct for_loop {
+        template <template <std::size_t> class Op, typename T = void>
+        inline static void iterate(
+            typename std::enable_if<start < end, T>::type* = nullptr
+                                  ) {
+            Op<start>()();
+            if (start < end)
+                for_loop<start + 1, end>::template iterate<Op>();
+        };
+        template <template <std::size_t> class Op, typename T = void>
+        inline static void iterate(
+            typename std::enable_if<start >= end, T>::type* = nullptr
+                                  ) {};
     };
 }
 #endif  
