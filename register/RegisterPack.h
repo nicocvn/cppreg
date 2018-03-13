@@ -142,7 +142,7 @@ namespace cppreg {
         static_assert((
                           (BitOffset % RegWidth) == 0
                           &&
-                          (RegisterPack::pack_address % (RegWidth / 8u) == 0)
+                          (RegisterPack::pack_base % (RegWidth / 8u) == 0)
                       ),
                       "register mis-alignment with respect to pack base");
 
