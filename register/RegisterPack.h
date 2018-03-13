@@ -160,8 +160,9 @@ namespace cppreg {
      */
     template <typename... T>
     struct PackIndexing {
+        using tuple_t = typename std::tuple<T...>;
         template <std::size_t N>
-        using regs = typename std::tuple_element<N, std::tuple<T...>>::type;
+        using regs = typename std::tuple_element<N, tuple_t>::type;
     };
 
 
@@ -179,22 +180,32 @@ namespace cppreg {
          *
          * This will call Op for the range [start, end).
          */
-        template <template <std::size_t> class Op, typename T = void>
+        template <typename Op, typename T = void>
         inline static void loop(
             typename std::enable_if<start < end, T>::type* = nullptr
                                ) {
-            Op<start>()();
+            Op().template operator()<start>();
             if (start < end)
-                for_loop<start + 1, end>::template iterate<Op>();
+                for_loop<start + 1, end>::template loop<Op>();
         };
 
         //! Loop method closure.
-        template <template <std::size_t> class Op, typename T = void>
+        template <typename Op, typename T = void>
         inline static void loop(
             typename std::enable_if<start >= end, T>::type* = nullptr
                                ) {};
 
     };
+
+
+    //! Template range loop implementation.
+    /**
+     * @tparam IndexedPack Indexed pack type.
+     */
+    template <typename IndexedPack>
+    struct range_loop : for_loop<
+        0, std::tuple_size<typename IndexedPack::tuple_t>::value
+                                > {};
 
 
 }
