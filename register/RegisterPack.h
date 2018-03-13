@@ -176,25 +176,46 @@ namespace cppreg {
 
         //! Loop method.
         /**
-         * @tparam Op Operation to be called at each iteration.
+         * @tparam Func Function to be called at each iteration.
          *
          * This will call Op for the range [start, end).
          */
-        template <typename Op, typename T = void>
-        inline static void loop(
-            typename std::enable_if<start < end, T>::type* = nullptr
-                               ) {
-            Op().template operator()<start>();
+        template <typename Func>
+        inline static void loop() {
+            Func().template operator()<start>();
             if (start < end)
-                for_loop<start + 1, end>::template loop<Op>();
+                for_loop<start + 1, end>::template loop<Func>();
         };
 
-        //! Loop method closure.
-        template <typename Op, typename T = void>
-        inline static void loop(
-            typename std::enable_if<start >= end, T>::type* = nullptr
-                               ) {};
+#if __cplusplus >= 201402L
+        //! Apply method.
+        /**
+         * @tparam Op Operator type to be called.
+         *
+         * This is only available with C++14 and up as this requires polymorphic
+         * lambdas to be used in a somewhat useful manner.
+         *
+         * Typical example:
+         * use lambda [](auto index) { index.value will be the loop index};
+         */
+        template <typename Op>
+        inline static void apply(Op& f) {
+            if (start < end) {
+                f(std::integral_constant<std::size_t, start>{});
+                for_loop<start + 1, end>::apply(f);
+            };
+        };
+#endif  // __cplusplus 201402L
 
+    };
+    template <std::size_t end>
+    struct for_loop<end, end> {
+        template <typename Func>
+        inline static void loop() {};
+#if __cplusplus >= 201402L
+        template <typename Op>
+        inline static void apply(Op& f) {};
+#endif  // __cplusplus 201402L
     };
 
 
