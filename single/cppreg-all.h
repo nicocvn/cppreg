@@ -167,10 +167,7 @@ namespace internals {
         typename RegisterType<W>::type value,
         typename RegisterType<W>::type limit
     >
-    struct check_overflow {
-        using result =
-        typename std::integral_constant<bool, value <= limit>::type;
-    };
+    struct check_overflow : std::integral_constant<bool, value <= limit> {};
 }
 }
 #endif  
@@ -263,7 +260,7 @@ namespace cppreg {
         typename std::enable_if<
             (internals::check_overflow<
                 Register::size, new_value, (F::mask >> F::offset)
-                                      >::result::value),
+                                      >::value),
             T
                                >::type&&
         with() const && noexcept {
@@ -372,7 +369,7 @@ namespace cppreg {
         typename std::enable_if<
             internals::check_overflow<
                 size, value, (F::mask >> F::offset)
-                                     >::result::value,
+                                     >::value,
             T
                                >::type&&
         merge_write() noexcept {
@@ -446,30 +443,47 @@ namespace cppreg {
         static_assert((
                           (BitOffset % RegWidth) == 0
                           &&
-                          (RegisterPack::pack_address % (RegWidth / 8u) == 0)
+                          (RegisterPack::pack_base % (RegWidth / 8u) == 0)
                       ),
                       "register mis-alignment with respect to pack base");
     };
     template <typename... T>
     struct PackIndexing {
+        using tuple_t = typename std::tuple<T...>;
         template <std::size_t N>
-        using regs = typename std::tuple_element<N, std::tuple<T...>>::type;
+        using regs = typename std::tuple_element<N, tuple_t>::type;
     };
     template <std::size_t start, std::size_t end>
     struct for_loop {
-        template <template <std::size_t> class Op, typename T = void>
-        inline static void loop(
-            typename std::enable_if<start < end, T>::type* = nullptr
-                               ) {
-            Op<start>()();
+        template <typename Func>
+        inline static void loop() {
+            Func().template operator()<start>();
             if (start < end)
-                for_loop<start + 1, end>::template iterate<Op>();
+                for_loop<start + 1, end>::template loop<Func>();
         };
-        template <template <std::size_t> class Op, typename T = void>
-        inline static void loop(
-            typename std::enable_if<start >= end, T>::type* = nullptr
-                               ) {};
+#if __cplusplus >= 201402L
+        template <typename Op>
+        inline static void apply(Op& f) {
+            if (start < end) {
+                f(std::integral_constant<std::size_t, start>{});
+                for_loop<start + 1, end>::apply(f);
+            };
+        };
+#endif  
     };
+    template <std::size_t end>
+    struct for_loop<end, end> {
+        template <typename Func>
+        inline static void loop() {};
+#if __cplusplus >= 201402L
+        template <typename Op>
+        inline static void apply(Op& f) {};
+#endif  
+    };
+    template <typename IndexedPack>
+    struct range_loop : for_loop<
+        0, std::tuple_size<typename IndexedPack::tuple_t>::value
+                                > {};
 }
 #endif  
 
@@ -495,14 +509,11 @@ namespace cppreg {
         constexpr static const bool has_shadow =
             parent_register::shadow::value;
         template <type value>
-        struct check_overflow {
-            constexpr static const bool result =
-                internals::check_overflow<
-                    parent_register::size,
-                    value,
-                    (mask >> offset)
-                                         >::result::value;
-        };
+        struct check_overflow : internals::check_overflow<
+            parent_register::size,
+            value,
+            (mask >> offset)
+                                                         > {};
         inline static type read() noexcept {
             return policy::template read<MMIO_t, type, mask, offset>(
                 parent_register::ro_mem_device()
@@ -533,7 +544,7 @@ namespace cppreg {
         typename std::enable_if<
             !has_shadow
             &&
-            check_overflow<value>::result,
+            check_overflow<value>::value,
             T
                                >::type
         write() noexcept {
@@ -546,7 +557,7 @@ namespace cppreg {
         typename std::enable_if<
             has_shadow
             &&
-            check_overflow<value>::result,
+            check_overflow<value>::value,
             T
                                >::type
         write() noexcept {
