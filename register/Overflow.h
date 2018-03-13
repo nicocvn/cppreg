@@ -34,10 +34,7 @@ namespace internals {
         typename RegisterType<W>::type value,
         typename RegisterType<W>::type limit
     >
-    struct check_overflow {
-        using result =
-        typename std::integral_constant<bool, value <= limit>::type;
-    };
+    struct check_overflow : std::integral_constant<bool, value <= limit> {};
 
 
 }

@@ -79,14 +79,11 @@ namespace cppreg {
          * This is only used for the template form of the write method.
          */
         template <type value>
-        struct check_overflow {
-            constexpr static const bool result =
-                internals::check_overflow<
-                    parent_register::size,
-                    value,
-                    (mask >> offset)
-                                         >::result::value;
-        };
+        struct check_overflow : internals::check_overflow<
+            parent_register::size,
+            value,
+            (mask >> offset)
+                                                         > {};
 
         //!@ Field read method.
         /**
@@ -147,7 +144,7 @@ namespace cppreg {
         typename std::enable_if<
             !has_shadow
             &&
-            check_overflow<value>::result,
+            check_overflow<value>::value,
             T
                                >::type
         write() noexcept {
@@ -168,7 +165,7 @@ namespace cppreg {
         typename std::enable_if<
             has_shadow
             &&
-            check_overflow<value>::result,
+            check_overflow<value>::value,
             T
                                >::type
         write() noexcept {

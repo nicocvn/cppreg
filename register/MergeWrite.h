@@ -131,7 +131,7 @@ namespace cppreg {
         typename std::enable_if<
             (internals::check_overflow<
                 Register::size, new_value, (F::mask >> F::offset)
-                                      >::result::value),
+                                      >::value),
             T
                                >::type&&
         with() const && noexcept {

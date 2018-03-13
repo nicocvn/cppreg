@@ -110,7 +110,7 @@ namespace cppreg {
         typename std::enable_if<
             internals::check_overflow<
                 size, value, (F::mask >> F::offset)
-                                     >::result::value,
+                                     >::value,
             T
                                >::type&&
         merge_write() noexcept {
