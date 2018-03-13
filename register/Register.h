@@ -23,10 +23,10 @@ namespace cppreg {
 
     //! Register data structure.
     /**
-     * @tparam address Register address.
-     * @tparam width Register total width (i.e., size).
-     * @tparam reset Register reset value (0x0 if unknown).
-     * @tparam shadow Boolean flag to enable shadow value (enabled if `true`).
+     * @tparam RegAddress Register address.
+     * @tparam RegWidth Register total width (i.e., size).
+     * @tparam ResetValue Register reset value (0x0 if unknown).
+     * @tparam UseShadow shadow Boolean flag to enable shadow value.
      *
      * This data structure will act as a container for fields and is
      * therefore limited to a strict minimum. It only carries information

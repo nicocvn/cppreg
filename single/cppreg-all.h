@@ -388,55 +388,67 @@ namespace cppreg {
 #ifndef CPPREG_REGISTERPACK_H
 #define CPPREG_REGISTERPACK_H
 namespace cppreg {
+    template <Address_t Address, std::uint32_t N, Width_t W>
+    struct memory_map {
+        using mem_array_t = std::array<
+            volatile typename RegisterType<W>::type,
+            N / sizeof(typename RegisterType<W>::type)
+                                      >;
+        static mem_array_t& array;
+    };
+    template <Address_t Address, std::uint32_t N, Width_t W>
+    typename memory_map<Address, N, W>::mem_array_t&
+        memory_map<Address, N, W>::array = *(
+            reinterpret_cast<typename memory_map<Address, N, W>::mem_array_t*>(
+                Address
+            )
+        );
     template <
         Address_t PackBase,
         std::uint32_t PackByteSize
     > struct RegisterPack {
-        using mem_array_t = std::array<volatile std::uint8_t, PackByteSize>;
         constexpr static const Address_t pack_base = PackBase;
         constexpr static const std::uint32_t size_in_bytes = PackByteSize;
-        static mem_array_t& _mem_array;
     };
     template <
-        Address_t PackBase,
-        std::uint32_t PackByteSize
-    >
-    typename RegisterPack<PackBase, PackByteSize>::mem_array_t&
-        RegisterPack<PackBase, PackByteSize>::_mem_array =
-        *(
-            reinterpret_cast<
-                RegisterPack<PackBase, PackByteSize>::mem_array_t* const
-                >(RegisterPack<PackBase, PackByteSize>::pack_base)
-        );
-    template <
         typename RegisterPack,
+        std::uint32_t BitOffset,
         Width_t RegWidth,
-        std::uint32_t OffsetInPack,
         typename RegisterType<RegWidth>::type ResetValue = 0x0,
         bool UseShadow = false
     >
     struct PackedRegister :
         Register<
-            RegisterPack::pack_base + OffsetInPack * 8,
+            RegisterPack::pack_base + (BitOffset / 8u),
             RegWidth,
             ResetValue,
             UseShadow
                 > {
         using base_reg = Register<
-            RegisterPack::pack_base + OffsetInPack * 8,
+            RegisterPack::pack_base + (BitOffset / 8u),
             RegWidth,
             ResetValue,
             UseShadow
                                  >;
+        using mem_map_t = memory_map<
+            RegisterPack::pack_base,
+            RegisterPack::size_in_bytes,
+            RegWidth
+                                    >;
         static typename base_reg::MMIO_t& rw_mem_device() {
-            return RegisterPack::_mem_array[OffsetInPack];
+            return mem_map_t::array[BitOffset / RegWidth];
         };
         static const typename base_reg::MMIO_t& ro_mem_device() {
-            return RegisterPack::_mem_array[OffsetInPack];
+            return mem_map_t::array[BitOffset / RegWidth];
         };
-        static_assert((OffsetInPack + (RegWidth / 8u)) <=
-                      RegisterPack::size_in_bytes,
+        static_assert((BitOffset / 8u) <= RegisterPack::size_in_bytes,
                       "packed register is overflowing the pack");
+        static_assert((
+                          (BitOffset % RegWidth) == 0
+                          &&
+                          (RegisterPack::pack_address % (RegWidth / 8u) == 0)
+                      ),
+                      "register mis-alignment with respect to pack base");
     };
     template <typename... T>
     struct PackIndexing {
@@ -446,17 +458,17 @@ namespace cppreg {
     template <std::size_t start, std::size_t end>
     struct for_loop {
         template <template <std::size_t> class Op, typename T = void>
-        inline static void iterate(
+        inline static void loop(
             typename std::enable_if<start < end, T>::type* = nullptr
-                                  ) {
+                               ) {
             Op<start>()();
             if (start < end)
                 for_loop<start + 1, end>::template iterate<Op>();
         };
         template <template <std::size_t> class Op, typename T = void>
-        inline static void iterate(
+        inline static void loop(
             typename std::enable_if<start >= end, T>::type* = nullptr
-                                  ) {};
+                               ) {};
     };
 }
 #endif  
