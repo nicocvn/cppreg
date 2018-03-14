@@ -35,12 +35,18 @@ Although `cppreg` is entirely written in C++, there is little (if any) overhead 
 * link time and dead code optimization (LTO and `--gc-section` with `-ffunction-sections` and `-fdata-sections`) can also help produce a more optimized version of the code.
 
 
-## Example: peripheral setup ##
-Consider an arbitrary peripheral with a setup register:
+## Prologue ##
+When developing firmware code for embedded MCUs it is customary that peripherals and devices are configured and operated through MMIO registers (for example, a UART or GPIO peripheral). For a given peripheral the related registers are grouped together at a specific location in memory. `cppreg` makes it possible to *map* C++ constructs to such peripherals and registers in order to get safer and more expressive code. The following two examples illustrate how to define such constructs using `cppreg`.
 
-| Absolute address (hex) | Register         | Width (bits) | Access             |
-|:----------------------:|:-----------------|:------------:|:------------------:|
-| 0xA400 0000 | Peripheral setup register   | 8            | R/W                |
+
+## Example: peripheral setup ##
+Consider an arbitrary peripheral with the following registers:
+
+| Address (hex) | Register         | Width (bits) | Access             |
+|:-------------:|:-----------------|:------------:|:------------------:|
+| 0xA400 0000   | Setup register   | 8            | R/W                |
+| 0xA400 0001   | RX data register | 8            | R                  |
+| 0xA400 0002   | TX data register | 8            | W                  |
 
 The setup register bits are mapped as:
 
@@ -48,33 +54,65 @@ The setup register bits are mapped as:
 * MODE field bits [5:6] to setup the peripheral mode,
 * EN field bits [7] to enable the peripheral.
 
-The goal of `cppreg` is to facilitate the manipulation of such a register and the first step is to define custom types (`Register` and `Field`) that maps to the peripheral:
+The RX and TX data registers both contain a single DATA field occupying the whole register. The DATA field is read-only for the RX register and write-only for the TX register.
+
+The goal of `cppreg` is to facilitate the manipulation of such a peripheral. This can be done as follow:
 
 ```c++
-#include <cppreg.h>
+#include <cppreg.h> // use cppreg-all.h instead if you are using the single header.
 using namespace cppreg;
 
-// Peripheral register.
-// The first template parameter is the register address.
-// The second template parameter is the register width in bits.
-struct Peripheral : Register<0xA4000000, 8u> {
+// Peripheral structure.
+// This will contain all the peripheral registers definitions.
+struct Peripheral {
 
-    // When defining a Field-based type:
-    // - the first template parameter is the owning register,
-    // - the second template parameter is the field width in bits,
-    // - the third template parameter is the offset in bits,
-    // - the last parameter is the access policy (readable and writable).
-    using Frequency = Field<Peripheral, 5u, 0u, read_write>;    // FREQ
-    using Mode = Field<Peripheral, 2u, 5u, read_write>;         // MODE
-    using Enable = Field<Peripheral, 1u, 7u, read_write>;       // EN
+    // Define a register pack type.
+    // This is used to indicate that the register are packed together in memory.
+    using periph_pack = RegisterPack<
+        0xA400 0000,        // Base address of the pack (i.e., peripheral).
+        3                   // Number of bytes for all peripheral registers.
+    >;
     
-    // To enable the peripheral:
-    // write 1 to EN field; if the peripheral fails to start this will be reset to zero.
-    // To disable the peripheral:
-    // clear EN field; no effect if not enabled.
+    // Define the setup register and the fields.
+    struct Setup : PackedRegister<
+        periph_pack,                // Pack to which the register belongs to.
+        0,                          // Offset in bits from the base.
+        8                           // Register width in bits 
+    > {
     
+        // When defining a Field-based type:
+        // - the first template parameter is the owning register,
+        // - the second template parameter is the field width in bits,
+        // - the third template parameter is the offset in bits,
+        // - the last parameter is the access policy.
+        using Frequency = Field<Setup, 5u, 0u, read_write>;    // FREQ
+        using Mode = Field<Setup, 2u, 5u, read_write>;         // MODE
+        using Enable = Field<Setup, 1u, 7u, read_write>;       // EN
+    
+    };
+    
+    // Define the RX data register.
+    struct RX : PackedRegister<
+        periph_pack,                // Pack to which the register belongs to.
+        8,                          // Offset in bits from the base.
+        8                           // Register width in bits 
+    > {
+        using Data = Field<RX, 8u, 0u, read_only>;
+    };
+    
+    // Define the RX data register.
+    struct TX : PackedRegister<
+        periph_pack,                // Pack to which the register belongs to.
+        8 * 2,                      // Offset in bits from the base.
+        8                           // Register width in bits 
+    > {
+        using Data = Field<TX, 8u, 0u, read_only>;
+    };
+
 };
 ```
+
+For more details about the various types (`RegisterPack`, `PackedRegister`, and `Field` see the [API documentation](API.md)).
 
 Now let's assume that we want to setup and enable the peripheral following the procedure:
 
@@ -82,55 +120,60 @@ Now let's assume that we want to setup and enable the peripheral following the p
 2. then the frequency, say with value `0x1A`,
 3. then write `1` to the enable field to start the peripheral.
 
+Once enabled we also want to implement a echo loop that will simply read data from the RX register and put them in the TX register so that the peripheral will echo whatever it receives.
+
 This translates to:
 
 ```c++
 // Setup and enable.
-Peripheral::Mode::write<0x2>();
-Peripheral::Frequency::write<0x1A>();
-Peripheral::Enable::set();
+Peripheral::Setup::Mode::write<0x2>();
+Peripheral::Setup::Frequency::write<0x1A>();
+Peripheral::Setup::Enable::set();
 
 // Check if properly enabled.
-if (!Peripheral::Enable::is_set()) {
+if (!Peripheral::Setup::Enable::is_set()) {
     // Peripheral failed to start ...
 };
 
-...
+// Echo loopback.
+while (true) {
 
-// Later on we want to disable the peripheral.
-Peripheral::Enable::clear();
+    // Read data.
+    const auto incoming_data = Peripheral::RX::Data::read();
+    
+    // Echo the data.
+    Peripheral::TX::Data::write(incoming_data);
+
+};
 ```
 
 A few remarks:
 
-* in the `write` calls we can also use `write(value)` instead of `write<value>()`; the latter only exists if `value` is `constexpr` (*i.e.*, known at compile time) but the benefits are that it will check for overflow at compile time and possibly use a faster implementation,
+* the `write` calls for the `Setup` register pass the data as template arguments, while the write call for the `TX` register pass it as a function argument: if the value to be written is known at compile time it is recommended to use the template form; the template form will detect overflow (see below) and will also make it possible to use a faster write implementation in some cases,
 * `Field`-based types have `is_set` and `is_clear` defined to conveniently query their states.
 
-The advantage of `cppreg` is that it limits the possibility of errors (see the [API documentation](API.md) for more details):
+In this example, we can already see how `cppreg` limits the possibility of errors (see the [API documentation](API.md) for more details):
 
 ```c++
 // Overflow checks.
-Peripheral::Mode::write<0x4>();         // Would not compile because it overflows the MODE field.
-Peripheral::Frequency::write<0xFF>();   // Idem. This overflows the FREQ field.
-Peripheral::Enable::set();
+Peripheral::Setup::Mode::write<0x4>();         // Would not compile because it overflows the MODE field.
+Peripheral::Setup::Frequency::write<0xFF>();   // Idem. This overflows the FREQ field.
+Peripheral::Setup::Enable::set();
 
 // Instead if you write:
-Peripheral::Mode::write(0x4);           // Compile but writes 0x0 to the MODE field.
-Peripheral::Frequency::write(0xFF);     // Compile but writes 0x1F to the FREQ field
+Peripheral::Setup::Mode::write(0x4);           // Compile but writes 0x0 to the MODE field.
+Peripheral::Setup::Frequency::write(0xFF);     // Compile but writes 0x1F to the FREQ field
+
+// Access policies.
+Peripheral::RX::Data::write<0x1>();            // Would not compile because read-only.
+Peripheral::TX::Data::read();                  // Would not compile because write-only.
 ```
 
 We can even add more expressive methods for our peripheral:
 
 ```c++
-#include <cppreg.h>
-using namespace cppreg;
-
 // Peripheral register.
-struct Peripheral : Register<0xA4000000, 8u> {
-
-    using Frequency = Field<Peripheral, 5u, 0u, read_write>;    // FREQ
-    using Mode = Field<Peripheral, 2u, 5u, read_write>;         // MODE
-    using Enable = Field<Peripheral, 1u, 7u, read_write>;       // EN
+struct PeripheralInterface : Peripheral {
     
     // To enable the peripheral:
     // write 1 to EN field; if the peripheral fails to start this will be reset to zero.
@@ -155,10 +198,12 @@ struct Peripheral : Register<0xA4000000, 8u> {
         Enable::clear();
     };
     
+    // ...
+    
 };
 
-Peripheral::configure<0x2, 01A>();
-Peripheral::enable();
+PeripheralInterface::configure<0x2, 01A>();
+PeripheralInterface::enable();
 ```
 
 
@@ -182,31 +227,32 @@ Using `cppreg` we can define custom types for these registers and define an inte
 // GPIO peripheral namespace.
 namespace gpio {
 
-    // To define a register type:
-    // using x = Register<register_address, register_width in bits>;
+    // Register pack.
+    // 6 x 32-bits = 6 x 4 bytes.
+    using gpio_pack = RegisterPack<0xF4000000, 6 * 4>;
     
     // Data output register (PDOR).
-    using pdor = Register<0xF4000000, 32u>;
+    using pdor = PackedRegister<gpio_pack, 0 * 32, 32u>;
 
     // Set output register (PSOR).
-    using psor = Register<0xF4000004, 32u>;
+    using psor = PackedRegister<gpio_pack, 1 * 32, 32u>;
 
     // Clear output register (PCOR).
-    using pcor = Register<0xF4000008, 32u>;
+    using pcor = PackedRegister<gpio_pack, 2 * 32, 32u>;
 
     // Toggle output register (PTOR).
-    using ptor = Register<0xF400000C, 32u>;
+    using ptor = PackedRegister<gpio_pack, 3 * 32, 32u>;
 
     // Data input register.
-    using pdir = Register<0xF4000010, 32u>
+    using pdir = PackedRegister<gpio_pack, 4 * 32, 32u>;
 
     // Data direction output register.
-    using pddr = Register<0xF4000014, 32u>    
+    using pddr = PackedRegister<gpio_pack, 5 * 32, 32u>;
 
 }
 ```
 
-For the purpose of this example we further assume that we are only interested in two pins of the GPIO: we have a red LED on pin 14 and a blue LED on pin 16. We can now use the `Register` types defined above to map these pins to specific `Field`. Because the logic is independent of the pin number we can even define a generic LED interface:
+For the purpose of this example we further assume that we are only interested in two pins of the GPIO: we have a red LED on pin 14 and a blue LED on pin 16. We can now use the `PackedRegister` types defined above to map these pins to specific `Field`. Because the logic is independent of the pin number we can even define a generic LED interface:
 
 ```c++
 // LEDs namespace.
@@ -252,7 +298,7 @@ namespace leds {
 }
 ```
 
-At this point we have defined an interface to initialize and control the LEDs attached to two GPIO pins. Note that, at no moment we had to deal with masking or shifting operations. Furthermore, we only needed to deal with the register addresses when defining the related types. At compile time, `cppreg` also makes sure that the field actually fits within the register specifications (a `Field` type cannot overflow its `Register` type).
+At this point we have defined an interface to initialize and control the LEDs attached to two GPIO pins. Note that, at no moment we had to deal with masking or shifting operations. Furthermore, we only needed to deal with the register addresses when defining the mapping. At compile time, `cppreg` also makes sure that the field actually fits within the register specifications (a `Field` type cannot overflow its `Register` type). Similarly, `cppreg` also checks that packed registers are properly aligned and fit within the pack.
 
 Using this interface it becomes easy to write very expressive code such as:
 
@@ -266,7 +312,7 @@ leds::blue::on();
 
 // Wait a bit.
 for (std::size_t i = 0; i < 500000; ++i)
-    __NOP();
+    asm("nop");
 
 // Turn off the blue LED.
 leds::blue::off();
