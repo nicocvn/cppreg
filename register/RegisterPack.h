@@ -19,6 +19,9 @@
 namespace cppreg {
 
 
+//! cppreg::internals namespace.
+namespace internals {
+
     //! Memory map implementation.
     /**
      * @tparam Address Memory base address.
@@ -53,6 +56,22 @@ namespace cppreg {
                 Address
             )
         );
+
+
+    //! is_aligned implementation.
+    /**
+     * @tparam Address Address to be checked for alignment.
+     * @tparam alignment Alignment constraint.
+     */
+    template <Address_t Address, std::size_t alignment>
+    struct is_aligned : std::integral_constant<
+        bool,
+        (Address & (alignment - 1)) == 0
+                                              > {
+    };
+
+
+}
 
 
     //! Register pack base implementation.
@@ -109,11 +128,11 @@ namespace cppreg {
                                  >;
 
         //! Memory map type.
-        using mem_map_t = memory_map<
+        using mem_map_t = internals::memory_map<
             RegisterPack::pack_base,
             RegisterPack::size_in_bytes,
             RegWidth
-                                    >;
+                                               >;
 
         //! Memory modifier.
         /**
@@ -135,16 +154,18 @@ namespace cppreg {
         static_assert((BitOffset / 8u) <= RegisterPack::size_in_bytes,
                       "packed register is overflowing the pack");
 
-        // Safety check to detect if the register is mis-aligned.
-        // A register is mis-aligned if it its offset is not a multiple of
-        // its size and if the pack base address alignment is different from
-        // its type alignment.
-        static_assert((
-                          (BitOffset % RegWidth) == 0
-                          &&
-                          (RegisterPack::pack_base % (RegWidth / 8u) == 0)
-                      ),
-                      "register mis-alignment with respect to pack base");
+        // A packed register of width N bits requires:
+        // - the pack address to be N-bits aligned (N/8 aligned),
+        // - the pack address with offset to be N-bits aligned (N/8 aligned).
+        static_assert(
+            internals::is_aligned<RegisterPack::pack_base, (RegWidth / 8)>
+            ::value
+            &&
+            internals::is_aligned<
+                RegisterPack::pack_base + (BitOffset / 8), (RegWidth / 8)
+                                 >::value,
+            "register is mis-aligned in the pack"
+                     );
 
 
     };
