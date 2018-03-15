@@ -18,7 +18,8 @@ namespace cppreg {
     enum class RegBitSize {
         b8,     
         b16,    
-        b32     
+        b32,    
+        b64     
     };
     using FieldWidth_t = std::uint8_t;
     using FieldOffset_t = std::uint8_t;
@@ -183,6 +184,13 @@ namespace cppreg {
         constexpr static const std::uint8_t max_field_width = 32u;
         constexpr static const std::uint8_t max_field_offset = 32u;
     };
+    template <> struct TypeTraits<RegBitSize::b64> {
+        using type = std::uint64_t;
+        constexpr static const std::uint8_t bit_size = 64u;
+        constexpr static const std::uint8_t byte_size = 8u;
+        constexpr static const std::uint8_t max_field_width = 64u;
+        constexpr static const std::uint8_t max_field_offset = 64u;
+    };
 }
 #endif  
 
@@ -226,7 +234,8 @@ namespace cppreg {
 #ifndef CPPREG_SHADOWVALUE_H
 #define CPPREG_SHADOWVALUE_H
 namespace cppreg {
-    template <typename Register, bool UseShadow> struct Shadow : std::false_type {};
+    template <typename Register, bool use_shadow>
+    struct Shadow : std::false_type {};
     template <typename Register>
     struct Shadow<Register, true> : std::true_type {
         static typename Register::type shadow_value;
@@ -247,9 +256,8 @@ namespace cppreg {
         FieldOffset_t offset,
         typename Register::type value
     > class MergeWrite_tmpl {
-    public:
-        using base_type = typename Register::type;
     private:
+        using base_type = typename Register::type;
         static_assert(!Register::shadow::value,
                       "merge write is not available for shadow value register");
         constexpr static const base_type _accumulated_value =
@@ -293,6 +301,11 @@ namespace cppreg {
             T
                                >::type&&
         with() const && noexcept {
+            static_assert(std::is_same<
+                              typename F::parent_register,
+                              Register
+                                      >::value,
+                          "field is not from the same register in merge_write");
             return std::move(T::make());
         };
     };
@@ -448,8 +461,8 @@ namespace internals {
     };
     template <
         typename RegisterPack,
-        std::uint32_t bit_offset,
         RegBitSize reg_size,
+        std::uint32_t bit_offset,
         typename TypeTraits<reg_size>::type reset_value = 0x0,
         bool use_shadow = false
     >
