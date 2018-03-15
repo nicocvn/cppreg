@@ -170,8 +170,8 @@ namespace cppreg {
                                >::type
         write() noexcept {
 
-            // For this particular we can simply forward to the non-constant
-            // implementation.
+            // For this particular we simply forward to the non-constant
+            // implementation because the shadow value needs to be updated.
             write(value);
 
         };

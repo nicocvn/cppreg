@@ -35,25 +35,15 @@ namespace cppreg {
     enum class RegBitSize {
         b8,     //!< 8-bit register.
         b16,    //!< 16-bit register.
-        b32     //!< 32-bit register.
+        b32,    //!< 32-bit register.
+        b64     //!< 64-bit register.
     };
 
-//    //! Type alias for register and field widths.
-//    /**
-//     * This limit the implementation to a maximum size of 256 bits for any
-//     * register or field.
-//     * This corresponds to the number of bits in the a register or field.
-//     */
+    //! Type alias field width.
     using FieldWidth_t = std::uint8_t;
 
 
-    //! Type alias for register and field offsets.
-    /**
-     * This limit the implementation to a maximum offset of 256 bits for any
-     * register or field.
-     * Given that we consider 32 bits address space and 32 bits register this
-     * should be enough.
-     */
+    //! Type alias for field offset.
     using FieldOffset_t = std::uint8_t;
 
 

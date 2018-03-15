@@ -25,8 +25,8 @@ namespace cppreg {
     /**
      * @tparam reg_address Register address.
      * @tparam reg_size Register size enum value.
-     * @tparam ResetValue Register reset value (0x0 if unknown).
-     * @tparam UseShadow shadow Boolean flag to enable shadow value.
+     * @tparam reset_value Register reset value (0x0 if unknown).
+     * @tparam use_shadow shadow Boolean flag to enable shadow value.
      *
      * This data structure will act as a container for fields and is
      * therefore limited to a strict minimum. It only carries information

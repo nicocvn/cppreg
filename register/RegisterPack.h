@@ -97,18 +97,18 @@ namespace internals {
     //! Packed register implementation.
     /**
      * @tparam RegisterPack Pack to which the register belongs.
-     * @tparam BitOffset Offset in bits for the register with respect to base.
-     * @tparam RegWidth Register width.
-     * @tparam ResetValue Register reset value (0x0 if unknown).
-     * @tparam UseShadow shadow Boolean flag to enable shadow value.
+     * @tparam reg_size Register size enum value.
+     * @tparam bit_offset Offset in bits for the register with respect to base.
+     * @tparam reset_value Register reset value (0x0 if unknown).
+     * @tparam use_shadow Boolean flag to enable shadow value.
      *
      * This implementation is intended to be used when defining a register
      * that belongs to a peripheral group.
      */
     template <
         typename RegisterPack,
-        std::uint32_t bit_offset,
         RegBitSize reg_size,
+        std::uint32_t bit_offset,
         typename TypeTraits<reg_size>::type reset_value = 0x0,
         bool use_shadow = false
     >

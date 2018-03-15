@@ -51,13 +51,10 @@ namespace cppreg {
     > class MergeWrite_tmpl {
 
 
-    public:
-
-        //! Type alias to register base type.
-        using base_type = typename Register::type;
-
-
     private:
+
+        // Type alias to register base type.
+        using base_type = typename Register::type;
 
         // Disabled for shadow value register.
         static_assert(!Register::shadow::value,
@@ -135,7 +132,16 @@ namespace cppreg {
             T
                                >::type&&
         with() const && noexcept {
+
+            // Check that the field belongs to the register.
+            static_assert(std::is_same<
+                              typename F::parent_register,
+                              Register
+                                      >::value,
+                          "field is not from the same register in merge_write");
+
             return std::move(T::make());
+
         };
 
 
