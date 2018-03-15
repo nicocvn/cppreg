@@ -21,7 +21,7 @@ namespace internals {
 
     //! Overflow check implementation.
     /**
-     * @tparam W Width of the register or field type.
+     * @tparam T Data type.
      * @tparam value Value to check.
      * @tparam limit Overflow limit value.
      *
@@ -30,9 +30,9 @@ namespace internals {
      * There is overflow if value if strictly larger than limit.
      */
     template <
-        Width_t W,
-        typename RegisterType<W>::type value,
-        typename RegisterType<W>::type limit
+        typename T,
+        T value,
+        T limit
     >
     struct check_overflow : std::integral_constant<bool, value <= limit> {};
 

@@ -28,13 +28,23 @@ namespace cppreg {
     using Address_t = std::uintptr_t;
 
 
-    //! Type alias for register and field widths.
+    //! Enumeration type for register size in bits.
     /**
-     * This limit the implementation to a maximum size of 256 bits for any
-     * register or field.
-     * This corresponds to the number of bits in the a register or field.
+     * This is used to enforce the supported register sizes.
      */
-    using Width_t = std::uint8_t;
+    enum class RegBitSize {
+        b8,     //!< 8-bit register.
+        b16,    //!< 16-bit register.
+        b32     //!< 32-bit register.
+    };
+
+//    //! Type alias for register and field widths.
+//    /**
+//     * This limit the implementation to a maximum size of 256 bits for any
+//     * register or field.
+//     * This corresponds to the number of bits in the a register or field.
+//     */
+    using FieldWidth_t = std::uint8_t;
 
 
     //! Type alias for register and field offsets.
@@ -44,7 +54,7 @@ namespace cppreg {
      * Given that we consider 32 bits address space and 32 bits register this
      * should be enough.
      */
-    using Offset_t = std::uint8_t;
+    using FieldOffset_t = std::uint8_t;
 
 
     //! Shorthand for max value as a mask.

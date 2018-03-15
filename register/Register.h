@@ -23,8 +23,8 @@ namespace cppreg {
 
     //! Register data structure.
     /**
-     * @tparam RegAddress Register address.
-     * @tparam RegWidth Register total width (i.e., size).
+     * @tparam reg_address Register address.
+     * @tparam reg_size Register size enum value.
      * @tparam ResetValue Register reset value (0x0 if unknown).
      * @tparam UseShadow shadow Boolean flag to enable shadow value.
      *
@@ -35,30 +35,31 @@ namespace cppreg {
      * create custom types.
      */
     template <
-        Address_t RegAddress,
-        Width_t RegWidth,
-        typename RegisterType<RegWidth>::type ResetValue = 0x0,
-        bool UseShadow = false
+        Address_t reg_address,
+        RegBitSize reg_size,
+        typename TypeTraits<reg_size>::type reset_value = 0x0,
+        bool use_shadow = false
     >
     struct Register {
 
         //! Register base type.
-        using type = typename RegisterType<RegWidth>::type;
+        using type = typename TypeTraits<reg_size>::type;
 
         //! MMIO pointer type.
         using MMIO_t = volatile type;
 
-        //! Register base address.
-        constexpr static const Address_t base_address = RegAddress;
+        //! Boolean flag for shadow value management.
+        using shadow = Shadow<Register, use_shadow>;
 
-        //! Register total width.
-        constexpr static const Width_t size = RegWidth;
+        //! Register base address.
+        constexpr static const Address_t base_address = reg_address;
+
+        //! Register size in bits.
+        constexpr static const std::uint8_t size =
+            TypeTraits<reg_size>::bit_size;
 
         //! Register reset value.
-        constexpr static const type reset = ResetValue;
-
-        //! Boolean flag for shadow value management.
-        using shadow = Shadow<Register, UseShadow>;
+        constexpr static const type reset = reset_value;
 
         //! Memory modifier.
         /**
@@ -109,7 +110,7 @@ namespace cppreg {
         inline static
         typename std::enable_if<
             internals::check_overflow<
-                size, value, (F::mask >> F::offset)
+                type, value, (F::mask >> F::offset)
                                      >::value,
             T
                                >::type&&
@@ -118,8 +119,8 @@ namespace cppreg {
         };
 
         // Sanity check.
-        static_assert(RegWidth != 0u,
-                      "defining a Register type of width 0u is not allowed");
+        static_assert(size != 0u,
+                      "defining a Register type of zero size is not allowed");
 
     };
 

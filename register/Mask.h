@@ -28,12 +28,12 @@ namespace cppreg {
      * @return The mask value.
      */
     template <typename Mask_t>
-    constexpr Mask_t make_mask(const Width_t width) noexcept {
+    constexpr Mask_t make_mask(const FieldWidth_t width) noexcept {
         return width == 0 ?
                0u
                           :
                static_cast<Mask_t>(
-                   (make_mask<Mask_t>(Width_t(width - 1)) << 1) | 1
+                   (make_mask<Mask_t>(FieldWidth_t(width - 1)) << 1) | 1
                );
     };
 
@@ -46,8 +46,8 @@ namespace cppreg {
      * @return The mask value.
      */
     template <typename Mask_t>
-    constexpr Mask_t make_shifted_mask(const Width_t width,
-                                       const Offset_t offset) noexcept {
+    constexpr Mask_t make_shifted_mask(const FieldWidth_t width,
+                                       const FieldOffset_t offset) noexcept {
         return static_cast<Mask_t>(make_mask<Mask_t>(width) << offset);
     };
 

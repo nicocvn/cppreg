@@ -15,8 +15,13 @@
 #define CPPREG_CPPREG_DEFINES_H
 namespace cppreg {
     using Address_t = std::uintptr_t;
-    using Width_t = std::uint8_t;
-    using Offset_t = std::uint8_t;
+    enum class RegBitSize {
+        b8,     
+        b16,    
+        b32     
+    };
+    using FieldWidth_t = std::uint8_t;
+    using FieldOffset_t = std::uint8_t;
     template <typename T>
     struct type_mask {
         constexpr static const T value = std::numeric_limits<T>::max();
@@ -28,7 +33,7 @@ namespace cppreg {
 #ifndef CPPREG_ACCESSPOLICY_H
 #define CPPREG_ACCESSPOLICY_H
 namespace cppreg {
-    template <typename MMIO_t, typename T, T mask, Offset_t offset>
+    template <typename MMIO_t, typename T, T mask, FieldOffset_t offset>
     struct RegisterRead {
         constexpr static const bool is_trivial =
             (mask == type_mask<T>::value) && (offset == 0u);
@@ -47,7 +52,7 @@ namespace cppreg {
             return static_cast<T>(mmio_device);
         };
     };
-    template <typename MMIO_t, typename T, T mask, Offset_t offset>
+    template <typename MMIO_t, typename T, T mask, FieldOffset_t offset>
     struct RegisterWrite {
         constexpr static const bool is_trivial =
             (mask == type_mask<T>::value) && (offset == 0u);
@@ -70,7 +75,9 @@ namespace cppreg {
             mmio_device = value;
         };
     };
-    template <typename MMIO_t, typename T, T mask, Offset_t offset, T value>
+    template <
+        typename MMIO_t, typename T, T mask, FieldOffset_t offset, T value
+    >
     struct RegisterWriteConstant {
         constexpr static const bool is_trivial =
             (mask == type_mask<T>::value) && (offset == 0u);
@@ -92,18 +99,20 @@ namespace cppreg {
         };
     };
     struct read_only {
-        template <typename MMIO_t, typename T, T mask, Offset_t offset>
+        template <typename MMIO_t, typename T, T mask, FieldOffset_t offset>
         inline static T read(const MMIO_t& mmio_device) noexcept {
             return RegisterRead<MMIO_t, T, mask, offset>::read(mmio_device);
         };
     };
     struct read_write : read_only {
-        template <typename MMIO_t, typename T, T mask, Offset_t offset>
+        template <typename MMIO_t, typename T, T mask, FieldOffset_t offset>
         inline static void write(MMIO_t& mmio_device,
                                  const T value) noexcept {
             RegisterWrite<MMIO_t, T, mask, offset>::write(mmio_device, value);
         };
-        template <typename MMIO_t, typename T, T mask, Offset_t offset, T value>
+        template <
+            typename MMIO_t, typename T, T mask, FieldOffset_t offset, T value
+        >
         inline static void write(MMIO_t& mmio_device) noexcept {
             RegisterWriteConstant<MMIO_t, T, mask, offset, value>
             ::write(mmio_device);
@@ -127,14 +136,16 @@ namespace cppreg {
         };
     };
     struct write_only {
-        template <typename MMIO_t, typename T, T mask, Offset_t offset>
+        template <typename MMIO_t, typename T, T mask, FieldOffset_t offset>
         inline static void write(MMIO_t& mmio_device,
                                  const T value) noexcept {
             RegisterWrite<MMIO_t, T, type_mask<T>::value, 0u>::write(
                 mmio_device, ((value << offset) & mask)
                                                                     );
         };
-        template <typename MMIO_t, typename T, T mask, Offset_t offset, T value>
+        template <
+            typename MMIO_t, typename T, T mask, FieldOffset_t offset, T value
+        >
         inline static void write(MMIO_t& mmio_device) noexcept {
             RegisterWriteConstant<
                 MMIO_t, T, type_mask<T>::value, 0u, ((value << offset) & mask)
@@ -149,11 +160,29 @@ namespace cppreg {
 #ifndef CPPREG_TRAITS_H
 #define CPPREG_TRAITS_H
 namespace cppreg {
-    template <Width_t Size>
-    struct RegisterType;
-    template <> struct RegisterType<8u> { using type = std::uint8_t; };
-    template <> struct RegisterType<16u> { using type = std::uint16_t; };
-    template <> struct RegisterType<32u> { using type = std::uint32_t; };
+    template <RegBitSize S>
+    struct TypeTraits;
+    template <> struct TypeTraits<RegBitSize::b8> {
+        using type = std::uint8_t;
+        constexpr static const std::uint8_t bit_size = 8u;
+        constexpr static const std::uint8_t byte_size = 1u;
+        constexpr static const std::uint8_t max_field_width = 8u;
+        constexpr static const std::uint8_t max_field_offset = 8u;
+    };
+    template <> struct TypeTraits<RegBitSize::b16> {
+        using type = std::uint16_t;
+        constexpr static const std::uint8_t bit_size = 16u;
+        constexpr static const std::uint8_t byte_size = 2u;
+        constexpr static const std::uint8_t max_field_width = 16u;
+        constexpr static const std::uint8_t max_field_offset = 16u;
+    };
+    template <> struct TypeTraits<RegBitSize::b32> {
+        using type = std::uint32_t;
+        constexpr static const std::uint8_t bit_size = 32u;
+        constexpr static const std::uint8_t byte_size = 4u;
+        constexpr static const std::uint8_t max_field_width = 32u;
+        constexpr static const std::uint8_t max_field_offset = 32u;
+    };
 }
 #endif  
 
@@ -163,9 +192,9 @@ namespace cppreg {
 namespace cppreg {
 namespace internals {
     template <
-        Width_t W,
-        typename RegisterType<W>::type value,
-        typename RegisterType<W>::type limit
+        typename T,
+        T value,
+        T limit
     >
     struct check_overflow : std::integral_constant<bool, value <= limit> {};
 }
@@ -177,17 +206,17 @@ namespace internals {
 #define CPPREG_MASK_H
 namespace cppreg {
     template <typename Mask_t>
-    constexpr Mask_t make_mask(const Width_t width) noexcept {
+    constexpr Mask_t make_mask(const FieldWidth_t width) noexcept {
         return width == 0 ?
                0u
                           :
                static_cast<Mask_t>(
-                   (make_mask<Mask_t>(Width_t(width - 1)) << 1) | 1
+                   (make_mask<Mask_t>(FieldWidth_t(width - 1)) << 1) | 1
                );
     };
     template <typename Mask_t>
-    constexpr Mask_t make_shifted_mask(const Width_t width,
-                                       const Offset_t offset) noexcept {
+    constexpr Mask_t make_shifted_mask(const FieldWidth_t width,
+                                       const FieldOffset_t offset) noexcept {
         return static_cast<Mask_t>(make_mask<Mask_t>(width) << offset);
     };
 }
@@ -215,7 +244,7 @@ namespace cppreg {
     template <
         typename Register,
         typename Register::type mask,
-        Offset_t offset,
+        FieldOffset_t offset,
         typename Register::type value
     > class MergeWrite_tmpl {
     public:
@@ -259,7 +288,7 @@ namespace cppreg {
         inline
         typename std::enable_if<
             (internals::check_overflow<
-                Register::size, new_value, (F::mask >> F::offset)
+                typename Register::type, new_value, (F::mask >> F::offset)
                                       >::value),
             T
                                >::type&&
@@ -330,18 +359,19 @@ namespace cppreg {
 #define CPPREG_REGISTER_H
 namespace cppreg {
     template <
-        Address_t RegAddress,
-        Width_t RegWidth,
-        typename RegisterType<RegWidth>::type ResetValue = 0x0,
-        bool UseShadow = false
+        Address_t reg_address,
+        RegBitSize reg_size,
+        typename TypeTraits<reg_size>::type reset_value = 0x0,
+        bool use_shadow = false
     >
     struct Register {
-        using type = typename RegisterType<RegWidth>::type;
+        using type = typename TypeTraits<reg_size>::type;
         using MMIO_t = volatile type;
-        constexpr static const Address_t base_address = RegAddress;
-        constexpr static const Width_t size = RegWidth;
-        constexpr static const type reset = ResetValue;
-        using shadow = Shadow<Register, UseShadow>;
+        using shadow = Shadow<Register, use_shadow>;
+        constexpr static const Address_t base_address = reg_address;
+        constexpr static const std::uint8_t size =
+            TypeTraits<reg_size>::bit_size;
+        constexpr static const type reset = reset_value;
         static MMIO_t& rw_mem_device() {
             return *(reinterpret_cast<MMIO_t* const>(base_address));
         };
@@ -368,15 +398,15 @@ namespace cppreg {
         inline static
         typename std::enable_if<
             internals::check_overflow<
-                size, value, (F::mask >> F::offset)
+                type, value, (F::mask >> F::offset)
                                      >::value,
             T
                                >::type&&
         merge_write() noexcept {
             return std::move(T::make());
         };
-        static_assert(RegWidth != 0u,
-                      "defining a Register type of width 0u is not allowed");
+        static_assert(size != 0u,
+                      "defining a Register type of zero size is not allowed");
     };
 }
 #endif  
@@ -385,67 +415,84 @@ namespace cppreg {
 #ifndef CPPREG_REGISTERPACK_H
 #define CPPREG_REGISTERPACK_H
 namespace cppreg {
-    template <Address_t Address, std::uint32_t N, Width_t W>
+namespace internals {
+    template <Address_t address, std::uint32_t n, RegBitSize reg_size>
     struct memory_map {
         using mem_array_t = std::array<
-            volatile typename RegisterType<W>::type,
-            N / sizeof(typename RegisterType<W>::type)
+            volatile typename TypeTraits<reg_size>::type,
+            n / sizeof(typename TypeTraits<reg_size>::type)
                                       >;
         static mem_array_t& array;
     };
-    template <Address_t Address, std::uint32_t N, Width_t W>
-    typename memory_map<Address, N, W>::mem_array_t&
-        memory_map<Address, N, W>::array = *(
-            reinterpret_cast<typename memory_map<Address, N, W>::mem_array_t*>(
-                Address
+    template <Address_t address, std::uint32_t n, RegBitSize reg_size>
+    typename memory_map<address, n, reg_size>::mem_array_t&
+        memory_map<address, n, reg_size>::array = *(
+            reinterpret_cast<typename memory_map<address, n, reg_size>
+            ::mem_array_t*>(
+                address
             )
         );
+    template <Address_t address, std::size_t alignment>
+    struct is_aligned : std::integral_constant<
+        bool,
+        (address & (alignment - 1)) == 0
+                                              > {
+    };
+}
     template <
-        Address_t PackBase,
-        std::uint32_t PackByteSize
+        Address_t base_address,
+        std::uint32_t pack_byte_size
     > struct RegisterPack {
-        constexpr static const Address_t pack_base = PackBase;
-        constexpr static const std::uint32_t size_in_bytes = PackByteSize;
+        constexpr static const Address_t pack_base = base_address;
+        constexpr static const std::uint32_t size_in_bytes = pack_byte_size;
     };
     template <
         typename RegisterPack,
-        std::uint32_t BitOffset,
-        Width_t RegWidth,
-        typename RegisterType<RegWidth>::type ResetValue = 0x0,
-        bool UseShadow = false
+        std::uint32_t bit_offset,
+        RegBitSize reg_size,
+        typename TypeTraits<reg_size>::type reset_value = 0x0,
+        bool use_shadow = false
     >
     struct PackedRegister :
         Register<
-            RegisterPack::pack_base + (BitOffset / 8u),
-            RegWidth,
-            ResetValue,
-            UseShadow
+            RegisterPack::pack_base + (bit_offset / 8u),
+            reg_size,
+            reset_value,
+            use_shadow
                 > {
         using base_reg = Register<
-            RegisterPack::pack_base + (BitOffset / 8u),
-            RegWidth,
-            ResetValue,
-            UseShadow
+            RegisterPack::pack_base + (bit_offset / 8u),
+            reg_size,
+            reset_value,
+            use_shadow
                                  >;
-        using mem_map_t = memory_map<
+        using mem_map_t = internals::memory_map<
             RegisterPack::pack_base,
             RegisterPack::size_in_bytes,
-            RegWidth
-                                    >;
+            reg_size
+                                               >;
         static typename base_reg::MMIO_t& rw_mem_device() {
-            return mem_map_t::array[BitOffset / RegWidth];
+            return mem_map_t::array[bit_offset
+                                    / TypeTraits<reg_size>::bit_size];
         };
         static const typename base_reg::MMIO_t& ro_mem_device() {
-            return mem_map_t::array[BitOffset / RegWidth];
+            return mem_map_t::array[bit_offset
+                                    / TypeTraits<reg_size>::bit_size];
         };
-        static_assert((BitOffset / 8u) <= RegisterPack::size_in_bytes,
+        static_assert((bit_offset / 8u) <= RegisterPack::size_in_bytes,
                       "packed register is overflowing the pack");
-        static_assert((
-                          (BitOffset % RegWidth) == 0
-                          &&
-                          (RegisterPack::pack_base % (RegWidth / 8u) == 0)
-                      ),
-                      "register mis-alignment with respect to pack base");
+        static_assert(
+            internals::is_aligned<
+                RegisterPack::pack_base,
+                TypeTraits<reg_size>::byte_size
+                                 >::value
+            &&
+            internals::is_aligned<
+                RegisterPack::pack_base + (bit_offset / 8),
+                TypeTraits<reg_size>::byte_size
+                                 >::value,
+            "register is mis-aligned in the pack"
+                     );
     };
     template <typename... T>
     struct PackIndexing {
@@ -493,8 +540,8 @@ namespace cppreg {
 namespace cppreg {
     template <
         typename BaseRegister,
-        Width_t FieldWidth,
-        Offset_t FieldOffset,
+        FieldWidth_t field_width,
+        FieldOffset_t field_offset,
         typename AccessPolicy
     >
     struct Field {
@@ -502,15 +549,15 @@ namespace cppreg {
         using type = typename parent_register::type;
         using MMIO_t = typename parent_register::MMIO_t;
         using policy = AccessPolicy;
-        constexpr static const Width_t width = FieldWidth;
-        constexpr static const Offset_t offset = FieldOffset;
+        constexpr static const FieldWidth_t width = field_width;
+        constexpr static const FieldOffset_t offset = field_offset;
         constexpr static const type mask = make_shifted_mask<type>(width,
                                                                    offset);
         constexpr static const bool has_shadow =
             parent_register::shadow::value;
         template <type value>
         struct check_overflow : internals::check_overflow<
-            parent_register::size,
+            type,
             value,
             (mask >> offset)
                                                          > {};
@@ -585,7 +632,7 @@ namespace cppreg {
                       "field width is larger than parent register size");
         static_assert(parent_register::size >= width + offset,
                       "offset + width is larger than parent register size");
-        static_assert(FieldWidth != 0u,
+        static_assert(width != 0u,
                       "defining a Field type of width 0u is not allowed");
     };
 }

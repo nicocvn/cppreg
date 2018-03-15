@@ -46,7 +46,7 @@ namespace cppreg {
     template <
         typename Register,
         typename Register::type mask,
-        Offset_t offset,
+        FieldOffset_t offset,
         typename Register::type value
     > class MergeWrite_tmpl {
 
@@ -130,7 +130,7 @@ namespace cppreg {
         inline
         typename std::enable_if<
             (internals::check_overflow<
-                Register::size, new_value, (F::mask >> F::offset)
+                typename Register::type, new_value, (F::mask >> F::offset)
                                       >::value),
             T
                                >::type&&

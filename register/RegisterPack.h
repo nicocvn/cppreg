@@ -24,20 +24,20 @@ namespace internals {
 
     //! Memory map implementation.
     /**
-     * @tparam Address Memory base address.
-     * @tparam N Memory size in bytes.
-     * @tparam W Width in bits of the memory "elements".
+     * @tparam address Memory base address.
+     * @tparam n Memory size in bytes.
+     * @tparam reg_size Register bit size for the array elements.
      *
      * This structure is used to map an array structure onto a memory region.
      * The width parameter will correspond to the register size.
      */
-    template <Address_t Address, std::uint32_t N, Width_t W>
+    template <Address_t address, std::uint32_t n, RegBitSize reg_size>
     struct memory_map {
 
         //! Array type.
         using mem_array_t = std::array<
-            volatile typename RegisterType<W>::type,
-            N / sizeof(typename RegisterType<W>::type)
+            volatile typename TypeTraits<reg_size>::type,
+            n / sizeof(typename TypeTraits<reg_size>::type)
                                       >;
 
         //! Static reference to memory array.
@@ -49,24 +49,25 @@ namespace internals {
     };
 
     //! Memory array reference definition.
-    template <Address_t Address, std::uint32_t N, Width_t W>
-    typename memory_map<Address, N, W>::mem_array_t&
-        memory_map<Address, N, W>::array = *(
-            reinterpret_cast<typename memory_map<Address, N, W>::mem_array_t*>(
-                Address
+    template <Address_t address, std::uint32_t n, RegBitSize reg_size>
+    typename memory_map<address, n, reg_size>::mem_array_t&
+        memory_map<address, n, reg_size>::array = *(
+            reinterpret_cast<typename memory_map<address, n, reg_size>
+            ::mem_array_t*>(
+                address
             )
         );
 
 
     //! is_aligned implementation.
     /**
-     * @tparam Address Address to be checked for alignment.
+     * @tparam address Address to be checked for alignment.
      * @tparam alignment Alignment constraint.
      */
-    template <Address_t Address, std::size_t alignment>
+    template <Address_t address, std::size_t alignment>
     struct is_aligned : std::integral_constant<
         bool,
-        (Address & (alignment - 1)) == 0
+        (address & (alignment - 1)) == 0
                                               > {
     };
 
@@ -76,19 +77,19 @@ namespace internals {
 
     //! Register pack base implementation.
     /**
-     * @tparam PackBase Pack base address.
-     * @tparam PackByteSize Pack size in bytes.
+     * @tparam base_address Pack base address.
+     * @tparam pack_byte_size Pack size in bytes.
      */
     template <
-        Address_t PackBase,
-        std::uint32_t PackByteSize
+        Address_t base_address,
+        std::uint32_t pack_byte_size
     > struct RegisterPack {
 
         //! Base address.
-        constexpr static const Address_t pack_base = PackBase;
+        constexpr static const Address_t pack_base = base_address;
 
         //! Pack size in bytes.
-        constexpr static const std::uint32_t size_in_bytes = PackByteSize;
+        constexpr static const std::uint32_t size_in_bytes = pack_byte_size;
 
     };
 
@@ -106,32 +107,32 @@ namespace internals {
      */
     template <
         typename RegisterPack,
-        std::uint32_t BitOffset,
-        Width_t RegWidth,
-        typename RegisterType<RegWidth>::type ResetValue = 0x0,
-        bool UseShadow = false
+        std::uint32_t bit_offset,
+        RegBitSize reg_size,
+        typename TypeTraits<reg_size>::type reset_value = 0x0,
+        bool use_shadow = false
     >
     struct PackedRegister :
         Register<
-            RegisterPack::pack_base + (BitOffset / 8u),
-            RegWidth,
-            ResetValue,
-            UseShadow
+            RegisterPack::pack_base + (bit_offset / 8u),
+            reg_size,
+            reset_value,
+            use_shadow
                 > {
 
         //! Register type.
         using base_reg = Register<
-            RegisterPack::pack_base + (BitOffset / 8u),
-            RegWidth,
-            ResetValue,
-            UseShadow
+            RegisterPack::pack_base + (bit_offset / 8u),
+            reg_size,
+            reset_value,
+            use_shadow
                                  >;
 
         //! Memory map type.
         using mem_map_t = internals::memory_map<
             RegisterPack::pack_base,
             RegisterPack::size_in_bytes,
-            RegWidth
+            reg_size
                                                >;
 
         //! Memory modifier.
@@ -139,7 +140,8 @@ namespace internals {
          * @return A reference to the writable register memory.
          */
         static typename base_reg::MMIO_t& rw_mem_device() {
-            return mem_map_t::array[BitOffset / RegWidth];
+            return mem_map_t::array[bit_offset
+                                    / TypeTraits<reg_size>::bit_size];
         };
 
         //! Memory accessor.
@@ -147,22 +149,26 @@ namespace internals {
          * @return A reference to the read-only register memory.
          */
         static const typename base_reg::MMIO_t& ro_mem_device() {
-            return mem_map_t::array[BitOffset / RegWidth];
+            return mem_map_t::array[bit_offset
+                                    / TypeTraits<reg_size>::bit_size];
         };
 
         // Safety check to detect if are overflowing the pack.
-        static_assert((BitOffset / 8u) <= RegisterPack::size_in_bytes,
+        static_assert((bit_offset / 8u) <= RegisterPack::size_in_bytes,
                       "packed register is overflowing the pack");
 
         // A packed register of width N bits requires:
         // - the pack address to be N-bits aligned (N/8 aligned),
         // - the pack address with offset to be N-bits aligned (N/8 aligned).
         static_assert(
-            internals::is_aligned<RegisterPack::pack_base, (RegWidth / 8)>
-            ::value
+            internals::is_aligned<
+                RegisterPack::pack_base,
+                TypeTraits<reg_size>::byte_size
+                                 >::value
             &&
             internals::is_aligned<
-                RegisterPack::pack_base + (BitOffset / 8), (RegWidth / 8)
+                RegisterPack::pack_base + (bit_offset / 8),
+                TypeTraits<reg_size>::byte_size
                                  >::value,
             "register is mis-aligned in the pack"
                      );

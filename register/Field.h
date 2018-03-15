@@ -39,8 +39,8 @@ namespace cppreg {
      */
     template <
         typename BaseRegister,
-        Width_t FieldWidth,
-        Offset_t FieldOffset,
+        FieldWidth_t field_width,
+        FieldOffset_t field_offset,
         typename AccessPolicy
     >
     struct Field {
@@ -58,10 +58,10 @@ namespace cppreg {
         using policy = AccessPolicy;
 
         //! Field width.
-        constexpr static const Width_t width = FieldWidth;
+        constexpr static const FieldWidth_t width = field_width;
 
         //! Field offset.
-        constexpr static const Offset_t offset = FieldOffset;
+        constexpr static const FieldOffset_t offset = field_offset;
 
         //! Field mask.
         constexpr static const type mask = make_shifted_mask<type>(width,
@@ -80,7 +80,7 @@ namespace cppreg {
          */
         template <type value>
         struct check_overflow : internals::check_overflow<
-            parent_register::size,
+            type,
             value,
             (mask >> offset)
                                                          > {};
@@ -226,7 +226,7 @@ namespace cppreg {
                       "field width is larger than parent register size");
         static_assert(parent_register::size >= width + offset,
                       "offset + width is larger than parent register size");
-        static_assert(FieldWidth != 0u,
+        static_assert(width != 0u,
                       "defining a Field type of width 0u is not allowed");
 
     };
