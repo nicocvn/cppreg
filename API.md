@@ -5,105 +5,147 @@ Copyright Sendyne Corp., 2010-2018. All rights reserved ([LICENSE](LICENSE)).
 ## Introduction ##
 `cppreg` provides ways to define custom C++ data types to represent memory-mapped input/output (MMIO) registers and fields. In essence, `cppreg` does contain very little *executable* code, but it does provide a framework to efficiently manipulate MMIO registers and fields.
 
-`cppreg` is primarily designed to be used in applications on *ARM Cortex-M*-like hardware, that is, MCUs with 32 bits registers and address space. It can easily be extended to support other types of architecture but this is not provided out-of-the-box.
+The entire implementation is encapsulated in the `cppreg::` namespace. All the code examples assume this namespace is accessible (*i.e.*, `using namespace cppreg` is implicit).
 
-The entire implementation is encapsulated in the `cppreg::` namespace.
 
 ## Overview ##
-`cppreg` provides two template structures that can be customized:
+`cppreg` API makes it possible to:
 
-* `Register`: used to define a MMIO register and its memory device,
-* `Field`: used to define a field in a MMIO register.
+* define a pack of registers: a register pack is simply a group of registers contiguous in memory (this is often the case when dealing with registers associated with a peripheral),
+* define single register at a specific memory address: this is provided as a fallback when the register pack implementation cannot be used,
+* define fields within registers (packed or not): a field corresponds to a group of bits within a register and comes with a specific access policy which control read and write accesses.
 
-The `Register` type itself is simply designed to keep track of the register address, size and other additional data (*i.e.*, reset value and shadow value setting). The `Field` type is the most interesting one as it is the type that provides access to part of the register memory device depending on the access policy.
+The API was designed such that `cppreg`-based code is safer and more expressive than traditional low-level code while providing the same level of performance.
+
+As explained below, when using `cppreg`, registers and fields are defined as C++ types specializing pre-defined template types. This can be done by explicitly deriving from the specialized template type or by using the `using` keyword (both approaches are strictly equivalent). With the exception of the merged write mechanism discussed below, all methods provided by the `cppreg` types are static methods. 
 
 
 ## Data types ##
 `cppreg` introduces type aliases in order to parameterize the set of data types used in the implementation. By default the following types are defined (see [cppreg_Defines.h](cppreg_Defines.h) for more details):
 
 * `Address_t` is the data type used to hold addresses of registers and fields; it is equivalent to `std::uintptr_t`,
-* `Width_t` and `Offset_t` are the data types to represent register and field sizes and offsets; both are equivalent to `std::uint8_t` (this effectively limits the maximal width and offset to 256).
+* register sizes are represented by the enumeration type `RegBitSize`,
+* `FieldWidth_t` and `FieldOffset_t` are the data types to represent field sizes and offsets; both are equivalent to `std::uint8_t`.
 
-The data type used to manipulate register and field content is derived from the register size. At the moment only 32-bits, 16-bits, and 8-bits registers are supported but additional register sizes can easily be added (see [Traits.h](register/Traits.h)).
+### Register size ###
+The `RegBitSize` enumeration type represents the register sizes supported in `cppreg` and the various values are:
 
+* `RegBitSize::b8` for 8-bit registers,
+* `RegBitSize::b16` for 16-bit registers,
+* `RegBitSize::b32` for 32-bit registers,
+* `RegBitSize::b64` for 64-bit registers.
 
-## Register ##
-The `Register` type implementation (see [Register.h](register/Register.h)) is designed to encapsulate details relevant to a particular MMIO register and provides access to the register memory. In `cppreg` the data type used to represent the memory register is always marked as `volatile`.
-
-To implement a particular register the following information are required at compile time:
-
-* the address of the register,
-* the register size (required to be different from `0`),
-* the reset value of the register (this is optional and is defaulted to zero),
-* a optional boolean flag to indicate if shadow value should be used (see below; this is optional and not enabled by default).
-
-For example, consider a 32-bits register `PeripheralRegister` mapped at `0x40004242`. The `Register` type can be derived from to create a `PeripheralRegister` C++ type:
-
-```c++
-// Register is defined as a struct so public inheritance is the default.
-struct PeripheralRegister : Register<0x40004242, 32u> {};
-```
-
-If `PeripheralRegister` has a reset value of `0xF0220F00` it can be added to the type definition by adding a template parameter (this is only useful when enabling shadow value as explained later):
-
-```c++
-struct PeripheralRegister : Register<0x40004242, 32u, 0xF0220F00> { ... };
-```
-
-Note that, it is also possible to simply define a type alias:
-
-```c++
-using PeripheralRegister = Register<0x40004242, 32u, 0xF0220F00>;
-```
-
-As we shall see below, the derived type `PeripheralRegister` is not very useful by itself. The benefit comes from using it to define `Field`-based types.
+The register size is used to define the C++ data type that represent the register content in [Traits.h](TypeTraits.h).
 
 
-## Field ##
-The `Field` type provided by `cppreg` (see [Field.h](register/Field.h)) contains the added value of the library in terms of type safety, efficiency and expression of intent. It is defined as a template structure and in order to define a custom field type the following information are required at compile time:
+## Register interface ##
+In `cppreg`, registers are represented as memory locations that contain fields, and do not provide any methods by themselves. There are two possible ways to define registers:
 
-* a `Register`-type describing the register in which the field memory resides,
-* the width of the field (required to be different from `0`),
-* the offset of the field in the register,
-* the access policy of the field (*i.e.*, read-write, read-only, or write-only).
+* for registers which are part of a pack (*i.e.*, group) the `RegisterPack` and `PackedRegister` types should be used,
+* for standalone register, the `Register` type is available.
 
-Assume that the register `PeripheralRegister` from the previous example contains a 6-bits field `Frequency ` with an offset of 12 bits (with respect to the register base address; that is, starting at the 13-th bits because the first bit is the 0-th bit). The corresponding custom `Field` type would be defined as:
+Most of the times registers are part of groups related to peripherals or specific functionalities within a MCU. It is therefore recommended to use the register pack implementation rather than the standalone one. This ensures that the assembly generated from `cppreg`-based code will be optimal. In other words, the difference between packed registers and standalone registers is only a matter of performance in the generated assembly: the packed register interface relies on mapping an array on the pack memory region, which provides to the compiler the ability to use offset between the various registers versus reloading their absolute addresses.
 
-```c++
-using Frequency = Field<PeripheralRegister, 6u, 12u, read_write>;
-```
+Moreover, the same level of functionality is provided by both implementations (`RegisterPack` is simply deriving from `Register` and overriding accessor and modifier methods). That is, a packed register type can be replaced by a standalone register type (and *vice versa*).
 
-It can also be nested with the definition of `PeripheralRegister`:
+### Register pack interface ###
+To define a pack of registers:
+
+1. define a `RegisterPack` type with the base address of the pack and the number of bytes,
+2. define `PackedRegister` types for all the registers in the pack.
+
+
+The interface is (see [RegisterPack.h](register/RegisterPack.h)):
+
+* `struct RegisterPack<pack_base_address, pack_size_in_bytes>`:
+
+    * `pack_base_address` is the starting address of the memory region that contains all the registers of the pack,
+    * `pack_size_in_bytes` is the size in bytes of the said memory region.
+
+* `struct PackedRegister<pack_type, RegBitSize_value, offset_in_bits, reset_value, use_shadow_value>`:
+
+    * `pack_type` is the `RegisterPack` type to which the register belongs,
+    * `RegBitSize_value` is the register size a `RegBitSize` value,
+    * `offet_in_bits` is the offset in bits with the respect to the pack base address,
+    * `reset_value` is the register reset value (defaulted to zero),
+    * `use_shadow_value` is a boolean indicating if a shadow value should be used (see below).
+
+Note that, the reset value is only useful when a shadow value is used.
+
+The following example defines a 4 bytes register pack starting at address 0xA4000000 and containing: two 8-bit register and a 16-bit register. The `cppreg` implementation is:
 
 ```c++
-// Register definition with nested field definition.
-struct PeripheralRegister : Register<0x40004242, 32u> {
-    using Frequency = Field<PeripheralRegister, 6u, 12u, read_write>; 
-};
+struct SomePeripheral {
 
-// This is strictly equivalent to:
-namespace PeripheralRegister {
-    using _REG = Register<0x40004242, 32u>;
-    using Frequency = Field<_REG, 6u, 12u, read_write>; 
+    // Define a register pack:
+    // - starting at address 0xA4000000,
+    // - with a size of 4 bytes.
+    using SomePack = RegisterPack<0xA4000000, 4>;
+    
+    // Strictly equivalent formlation:
+    // struct SomePack : RegisterPack<0xA4000000, 4> {};
+
+    // Define the first 8-bit register:
+    using FirstRegister = PackRegister<SomePack, RegBitSize::b8, 8 * 0>;
+    
+    // Define the second 8-bit register:
+    // (the last template parameter indicates the offset in bits)
+    using SecondRegister = PackRegister<SomePack, RegBitSize::b8, 8 * 1>;
+    
+    // Define the 16-bit register:
+    // (the last template parameter indicates the offset in bits)
+    using ThirdRegister = PackRegister<SomePack, RegBitSize::b16, 8 * 2>;
+    
+    // Strictly equivalent formulation:
+    // struct FirstRegister : PackRegister<SomePack, RegBitSize::b8, 0> {};
+    // ...
+    
 }
-
-// Or even:
-// (again, Field is defined as a struct so public inheritance is the default.
-struct PeripheralRegister : Register<0x40004242, 32u> {
-    struct Frequency : Field<PeripheralRegister, 6u, 12u, read_write> {};
-};
 ```
 
-which then makes it possible to write expression like:
+There are a few requirements for when defining packed registers:
+
+* for a register of size N bits, the pack base address has to be aligned on a N bits boundary,
+* for a register of size N bits, the pack base address plus the offset has to be aligned on a N bits boundary,
+* the offset plus the size of register should be less or equal to the size of the pack.
+
+These requirements are enforced at compile time and errors will occur if there are not met.
+
+### Standalone register interface ###
+The interface for standalone register is (see [Register.h](register/Register.h)):
+
+`struct Register<register_address, RegBitSize_value, reset_value, use_shadow_value>`:
+
+* `register_address` is the absolute address of the register,
+* `RegBitSize_value` is the register size a `RegBitSize` value,
+* `reset_value` is the register reset value (defaulted to zero),
+* `use_shadow_value` is a boolean indicating if a shadow value should be used (see below).
+
+Note that, the reset value is only useful when a shadow value is used.
+
+For example, consider a 32-bit register `SomeRegister` mapped at `0x40004242`. The `Register` type is created using:
 
 ```c++
-PeripheralRegister::Frequency::clear();
-PeripheralRegister::Frequency::write(0x10u);
+using SomeRegister = Register<0x40004242, RegBitSize::b32>;
+
+// Strictly equivalent formulation:
+// struct PeripheralRegister : Register<0x40004242, 32u> {};
 ```
 
-to clear the `Frequency` register and then write `0x10` to it.
+Similarly to the packed register interface, for a N bits register the address is required to be aligned on a N bits boundary. This requirement is enforced at compile time and will generate an error if not met.
 
-As the last example suggests, any `Field`-based type must define its access policy (the last template parameter). Depending on the access policy various static methods are available (or not) to perform read and write operations.
+
+## Field interface ##
+The `Field` template type provided by `cppreg` (see [Field.h](register/Field.h)) contains the added value of the library in terms of type safety, efficiency and expression of intent. The interface is:
+
+`struct Field<register, width_in_bits, offset_in_bits, access_policy>`:
+
+* `register` is the register type to which the field belongs,
+* `width_in_bits` is the number of bits in the field,
+* `offset_in_bits`is the field offset in bits with respect to the register address,
+* `access_policy` is a type describing the read/write access to the field.
+
+Compile-time errors will be generated if the field width and offset are not consistent with the parent register size.
 
 ### Access policy ###
 The last template parameter of a `Field`-based type describes the access policy of the field. Three access policies are available: 
@@ -126,28 +168,33 @@ Depending on the access policy, the `Field`-based type will provide accessors an
 
 Any attempt at calling an access method which is not provided by a given policy will result in a compilation error. This is one of the mechanism used by `cppreg` to provide safety when accessing registers and fields.
 
-For example using our previous `PeripheralRegister` example:
+### Example ###
+Consider a 32-bit register located at 0x40004242 containing (among other things): a R/W FREQ field over bits [12:17], a WO MODE field over bits [18:21], and a RO STATE field one over bits [28:31]. The `cppreg` implementation is:
 
 ```c++
 // Register definition with nested fields definitions.
-struct PeripheralRegister : Register<0x40004242, 32u> {
-    using Frequency = Field<PeripheralRegister, 6u, 12u, read_write>; 
-    using Mode = Field<PeripheralRegister, 4u, 18u, write_only>; 
-    using State = Field<PeripheralRegister, 4u, 18u, read_only>;  
+struct SomeRegister : Register<0x40004242, RegBitSize::b32> {
+    using Frequency = Field<SomeRegister, 6u, 12u, read_write>;
+    using Mode = Field<SomeRegister, 4u, 18u, write_only>;
+    using State = Field<SomeRegister, 4u, 28u, read_only>;
+    
+    // Strictly equivalent formulation:
+    // struct Frequency : Field<SomeRegister, 6u, 12u, read_write> {};
+    // ...
 };
 
 // This would compile:
-PeripheralRegister::Frequency::write(0x10);
-const auto freq = PeripheralRegister::Frequency::read();
-const auto state = PeripheralRegister::State::read();
+SomeRegister::Frequency::write<0x10>();
+const auto freq = SomeRegister::Frequency::read();
+const auto state = SomeRegister::State::read();
 
-// This would not compile:
-PeripheralRegister::State::write(0x1);
-const auto mode = PeripheralRegister::Mode::read();
+// This would not compile (State is read-only):
+SomeRegister::State::write<0x1>();
+const auto mode = SomeRegister::Mode::read();
 
 // This would compile ...
-// But read the section dedicated to write-only fields.
-PeripheralRegister::Mode::write(0xA);
+// But read the section dedicated to write-only fields !!!
+SomeRegister::Mode::write<0xA>();
 ```
 
 ### Constant value and overflow check ###
@@ -155,43 +202,42 @@ When performing write operations for any `Field`-based type, `cppreg` distinguis
 
 ```c++
 SomeField::write<0xAB>();       // Template version for constant value write.
-SomeField::write(0xAB);         // Function argument function.
+SomeField::write(0xAB);         // Function argument version.
 ```
 
 The advantages of using the constant value version are:
 
-* `cppreg` will (most of the time) use a faster implementation for the write operation,
+* `cppreg` will most of the time use a faster implementation for the write operation (this is particularly true if the field spans an entire register),
 * a compile-time error will occur if the value overflow the field.
 
-**Recommendation:** use the constant value version whenever it is possible.
-
-Note that, even when using the non-constant value version overflow will not occur: only the bits part of the `Field`-type will be written and any data that does not fit the region of the memory device assigned to the `Field`-type will not be modified:
+Note that, even when using the non-constant value version overflow will not occur: only the bits part of the `Field`-type will be written and any data that does not fit the region of the memory assigned to the `Field`-type will not be modified. For example:
 
 ```c++
 // Register definition with nested fields definitions.
-struct PeripheralRegister : Register<0x40004242, 32u> {
-    using Frequency = Field<PeripheralRegister, 8u, 12u, read_write>;
+struct SomeRegister : SomeRegister <0x40004242, RegBitSize::b32> {
+    using Frequency = Field<SomeRegister, 8u, 12u, read_write>;
 };
 
 // These two calls are strictly equivalent:
-PeripheralRegister::Frequency::write(0xAB);
-PeripheralRegister::Frequency::write<0xAB>();
+SomeRegister::Frequency::write(0xAB);
+SomeRegister::Frequency::write<0xAB>();
 
 // This call does not perform a compile-time check for overflow:
-PeripheralRegister::Frequency::write(0x111);    // But this will only write 0x11 to the memory device.
+// But this will only write 0x11 to the memory device.
+SomeRegister::Frequency::write(0x111); 
 
 // This call does perform a compile-time check for overflow and will not compile:
-PeripheralRegister::Frequency::write<0x111>();
+SomeRegister::Frequency::write<0x111>();
 ```
 
 
 ## Shadow value: a workaround for write-only fields ##
-Write-only fields are somewhat special as extra-care has to be taken when manipulating them. The main difficulty resides in the fact that write-only field can be read but the value obtained by reading it is fixed (*e.g.*, it always reads as zero). `cppreg` assumes that write-only fields can actually be read from; if such an access on some given architecture would trigger an error (*à la FPGA*) then `cppreg` is not a good choice to deal with write-only fields on this particular architecture. 
+Write-only fields are somewhat special as extra-care has to be taken when manipulating them. The main difficulty resides in the fact that write-only field can be read but the value obtained by reading it is fixed (*e.g.*, it always reads as zero). `cppreg` assumes that write-only fields can actually be read from; if such an access on some given architecture would trigger an error (*à la FPGA*) then `cppreg` is not a good choice to deal with write-only fields on this particular architecture.
 
 Consider the following situation:
 
 ```c++
-struct Reg : Register <0x00000001, 8u> {
+struct Reg : Register <0x00000001, RegBitSize::b8> {
     using f1 = Field<Reg, 1u, 0u, read_write>;
     using f2 = Field<Reg, 1u, 1u, write_only>; // Always reads as zero.
 }
@@ -200,9 +246,9 @@ struct Reg : Register <0x00000001, 8u> {
 Here is what will be happening (assuming the register is initially zeroed out):
 
 ```c++
-Reg::f1::write<0x1>();      // reg = (... 0000) | (... 0001) = (... 0001)
-Reg::f2::write<0x1>();      // reg = (... 0010), f1 got wiped out.
-Reg::f1::write<0x1>();      // reg = (... 0000) | (... 0001) = (... 0001), f2 wiped out cause it reads as zero.
+Reg::f1::write<0x1>();  // Reg = (... 0000) | (... 0001) = (... 0001)
+Reg::f2::write<0x1>();  // Reg = (... 0010), f1 got wiped out.
+Reg::f1::write<0x1>();  // Reg = (... 0000) | (... 0001) = (... 0001), f2 wiped out cause it reads as zero.
 ```
 
 This shows two issues:
@@ -210,12 +256,14 @@ This shows two issues:
 * the default `write` implementation for a write-only field will wipe out the register bits that are not part of the field,
 * when writing to the read-write field it wipes out the write-only field because there is no way to retrieve the value that was previously written.
 
+On the other hand, if we were considering an example where a single write-only field extend over an entire register (see the GPIO example in the [quick start](QuickStart.md) documentation) there will be no issue.
+
 As a workaround, `cppreg` offers a shadow value implementation which mitigates the issue by tracking the register value. This implementation can be triggered when defining a register type by using an explicit reset value and a boolean flag:
 
 ```c++
 struct Reg : Register<
     0x40004242,         // Register address
-    32u,                // Register size
+    RegBitSize::b32,    // Register size
     0x42u               // Register reset value
     true                // Enable shadow value for the register
     >
@@ -245,7 +293,7 @@ It is sometimes the case that multiple fields within a register needs to be writ
 Consider the following setup (not so artifical; it is inspired by a real flash memory controller peripheral):
 
 ```c++
-struct FlashCtrl : Register<0xF0008282, 8u> {
+struct FlashCtrl : Register<0xF0008282, RegBitSize::b8> {
 
     // Command field.
     // Can bet set to various values to trigger write, erase or check operations.
@@ -277,7 +325,7 @@ Now let's assume the following scenario:
 3. At this point one could try to set the value for the new command but that will fail as well (because `ProtectionError` was not cleared and it is required to be).
 4. A possible alternative would be to fully zero out the `FlashCtrl` register but that would somewhat defeat the purpose of `cppreg`.
 
-For this kind of situation a *merge write* mechanism was implemented in `cppreg` to merge multiple write operations into a single one. This makes it possible to write the following code to solve the flash controller issue:
+For this kind of situation a *merged write* mechanism was implemented in `cppreg` to merge multiple write operations into a single one. This makes it possible to write the following code to solve the flash controller issue:
 
 
 ```c++
@@ -289,9 +337,9 @@ FlashCtrl::merge_write<FlashCtrl::ProtectionError, 0x1>().with<FlashCtrl::Comman
 // 0000 XXXX | 0001 0000 = 0001 XXXX ... CommandComplete is not set to 1 !
 ```
 
-The `merge_write` method is only available in `Register`-based type that do not enable the shadow value mechanism. The `Field`-based types used in the chained call are required to *be from* the `Register` type used to call `merge_write`. In addition, the `Field`-types are also required to be writable. By design, the successive write operations have to be chained, that is, it is not possible to capture a merged write context and add other write operations to it; it always has to be of the form: `register::merge_write<field1, xxx>().with<field2, xxx>(). ... .done()`.
+The `merge_write` method is only available in register type (`PackedRegister` or `Register`) that do not enable the shadow value mechanism. The `Field`-based types used in the chained call are required to *be from* the register type used to call `merge_write`. In addition, the `Field`-types are also required to be writable. By design, the successive write operations have to be chained, that is, it is not possible to capture a `merge_write` context and add other write operations to it; it always has to be of the form: `register::merge_write<field1, xxx>().with<field2, xxx>(). ... .done()`.
 
 **Warning:** if`done()` is not called at the end of the successive write operations no write at all will be performed.
 
-Similarly to regular write operations it is recommended to use the template version (as shown in the example) if possible: this will enable overflow checking and possibly use faster write implementations. If not possible the values to be written are passed as arguments to the various methods.
+Similarly to regular write operations it is recommended to use the template version (as shown in the example) if possible: this will enable overflow checking and possibly use faster write implementations. If not possible the values to be written are passed as arguments to the various calls.
 
