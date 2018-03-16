@@ -10,7 +10,7 @@
 #define CPPREG_CPPREG_H
 
 
-#include "Overflow.h"
+#include "Internals.h"
 #include "MergeWrite.h"
 #include "Register.h"
 #include "RegisterPack.h"

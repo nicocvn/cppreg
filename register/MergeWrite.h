@@ -18,7 +18,7 @@
 #define CPPREG_MERGEWRITE_H
 
 
-#include "Overflow.h"
+#include "Internals.h"
 #include "AccessPolicy.h"
 #include <functional>
 

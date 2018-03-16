@@ -120,7 +120,14 @@ namespace cppreg {
 
         // Sanity check.
         static_assert(size != 0u,
-                      "defining a Register type of zero size is not allowed");
+                      "Register: register definition with zero size");
+
+        // Enforce alignment.
+        static_assert(
+            internals::is_aligned<reg_address, TypeTraits<reg_size>::byte_size>
+            ::value,
+            "Register: address is mis-aligned for register type"
+                     );
 
     };
 

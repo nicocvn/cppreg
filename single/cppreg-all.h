@@ -30,6 +30,76 @@ namespace cppreg {
 }
 #endif  
 
+// Traits.h
+#ifndef CPPREG_TRAITS_H
+#define CPPREG_TRAITS_H
+namespace cppreg {
+    template <RegBitSize S>
+    struct TypeTraits;
+    template <> struct TypeTraits<RegBitSize::b8> {
+        using type = std::uint8_t;
+        constexpr static const std::uint8_t bit_size = 8u;
+        constexpr static const std::uint8_t byte_size = bit_size / 8u;
+    };
+    template <> struct TypeTraits<RegBitSize::b16> {
+        using type = std::uint16_t;
+        constexpr static const std::uint8_t bit_size = 16u;
+        constexpr static const std::uint8_t byte_size = bit_size / 8u;
+    };
+    template <> struct TypeTraits<RegBitSize::b32> {
+        using type = std::uint32_t;
+        constexpr static const std::uint8_t bit_size = 32u;
+        constexpr static const std::uint8_t byte_size = bit_size / 8u;
+    };
+    template <> struct TypeTraits<RegBitSize::b64> {
+        using type = std::uint64_t;
+        constexpr static const std::uint8_t bit_size = 64u;
+        constexpr static const std::uint8_t byte_size = bit_size / 8u;
+    };
+}
+#endif  
+
+// Internals.h
+#ifndef CPPREG_INTERNALS_H
+#define CPPREG_INTERNALS_H
+namespace cppreg {
+namespace internals {
+    template <
+        typename T,
+        T value,
+        T limit
+    >
+    struct check_overflow : std::integral_constant<bool, value <= limit> {};
+    template <Address_t address, std::size_t alignment>
+    struct is_aligned : std::integral_constant<
+        bool,
+        (address & (alignment - 1)) == 0
+                                              > {
+    };
+    template <Address_t address, std::uint32_t n, RegBitSize reg_size>
+    struct memory_map {
+        using mem_array_t = std::array<
+            volatile typename TypeTraits<reg_size>::type,
+            n / sizeof(typename TypeTraits<reg_size>::type)
+                                      >;
+        static mem_array_t& array;
+        static_assert(
+            is_aligned<address, TypeTraits<reg_size>::byte_size>::value,
+            "memory_map: base address is mis-aligned for register type"
+                     );
+    };
+    template <Address_t address, std::uint32_t n, RegBitSize reg_size>
+    typename memory_map<address, n, reg_size>::mem_array_t&
+        memory_map<address, n, reg_size>::array = *(
+            reinterpret_cast<typename memory_map<address, n, reg_size>
+            ::mem_array_t*>(
+                address
+            )
+        );
+}
+}
+#endif  
+
 // AccessPolicy.h
 #ifndef CPPREG_ACCESSPOLICY_H
 #define CPPREG_ACCESSPOLICY_H
@@ -154,58 +224,6 @@ namespace cppreg {
             ::write(mmio_device);
         };
     };
-}
-#endif  
-
-// Traits.h
-#ifndef CPPREG_TRAITS_H
-#define CPPREG_TRAITS_H
-namespace cppreg {
-    template <RegBitSize S>
-    struct TypeTraits;
-    template <> struct TypeTraits<RegBitSize::b8> {
-        using type = std::uint8_t;
-        constexpr static const std::uint8_t bit_size = 8u;
-        constexpr static const std::uint8_t byte_size = 1u;
-        constexpr static const std::uint8_t max_field_width = 8u;
-        constexpr static const std::uint8_t max_field_offset = 8u;
-    };
-    template <> struct TypeTraits<RegBitSize::b16> {
-        using type = std::uint16_t;
-        constexpr static const std::uint8_t bit_size = 16u;
-        constexpr static const std::uint8_t byte_size = 2u;
-        constexpr static const std::uint8_t max_field_width = 16u;
-        constexpr static const std::uint8_t max_field_offset = 16u;
-    };
-    template <> struct TypeTraits<RegBitSize::b32> {
-        using type = std::uint32_t;
-        constexpr static const std::uint8_t bit_size = 32u;
-        constexpr static const std::uint8_t byte_size = 4u;
-        constexpr static const std::uint8_t max_field_width = 32u;
-        constexpr static const std::uint8_t max_field_offset = 32u;
-    };
-    template <> struct TypeTraits<RegBitSize::b64> {
-        using type = std::uint64_t;
-        constexpr static const std::uint8_t bit_size = 64u;
-        constexpr static const std::uint8_t byte_size = 8u;
-        constexpr static const std::uint8_t max_field_width = 64u;
-        constexpr static const std::uint8_t max_field_offset = 64u;
-    };
-}
-#endif  
-
-// Overflow.h
-#ifndef CPPREG_OVERFLOW_H
-#define CPPREG_OVERFLOW_H
-namespace cppreg {
-namespace internals {
-    template <
-        typename T,
-        T value,
-        T limit
-    >
-    struct check_overflow : std::integral_constant<bool, value <= limit> {};
-}
 }
 #endif  
 
@@ -419,7 +437,12 @@ namespace cppreg {
             return std::move(T::make());
         };
         static_assert(size != 0u,
-                      "defining a Register type of zero size is not allowed");
+                      "Register: register definition with zero size");
+        static_assert(
+            internals::is_aligned<reg_address, TypeTraits<reg_size>::byte_size>
+            ::value,
+            "Register: address is mis-aligned for register type"
+                     );
     };
 }
 #endif  
@@ -428,30 +451,6 @@ namespace cppreg {
 #ifndef CPPREG_REGISTERPACK_H
 #define CPPREG_REGISTERPACK_H
 namespace cppreg {
-namespace internals {
-    template <Address_t address, std::uint32_t n, RegBitSize reg_size>
-    struct memory_map {
-        using mem_array_t = std::array<
-            volatile typename TypeTraits<reg_size>::type,
-            n / sizeof(typename TypeTraits<reg_size>::type)
-                                      >;
-        static mem_array_t& array;
-    };
-    template <Address_t address, std::uint32_t n, RegBitSize reg_size>
-    typename memory_map<address, n, reg_size>::mem_array_t&
-        memory_map<address, n, reg_size>::array = *(
-            reinterpret_cast<typename memory_map<address, n, reg_size>
-            ::mem_array_t*>(
-                address
-            )
-        );
-    template <Address_t address, std::size_t alignment>
-    struct is_aligned : std::integral_constant<
-        bool,
-        (address & (alignment - 1)) == 0
-                                              > {
-    };
-}
     template <
         Address_t base_address,
         std::uint32_t pack_byte_size
@@ -466,13 +465,12 @@ namespace internals {
         typename TypeTraits<reg_size>::type reset_value = 0x0,
         bool use_shadow = false
     >
-    struct PackedRegister :
-        Register<
-            RegisterPack::pack_base + (bit_offset / 8u),
-            reg_size,
-            reset_value,
-            use_shadow
-                > {
+    struct PackedRegister : Register<
+        RegisterPack::pack_base + (bit_offset / 8u),
+        reg_size,
+        reset_value,
+        use_shadow
+                                    > {
         using base_reg = Register<
             RegisterPack::pack_base + (bit_offset / 8u),
             reg_size,
@@ -484,27 +482,32 @@ namespace internals {
             RegisterPack::size_in_bytes,
             reg_size
                                                >;
-        static typename base_reg::MMIO_t& rw_mem_device() {
+        inline static typename base_reg::MMIO_t& rw_mem_device() noexcept {
             return mem_map_t::array[bit_offset
                                     / TypeTraits<reg_size>::bit_size];
         };
-        static const typename base_reg::MMIO_t& ro_mem_device() {
+        inline static const typename base_reg::MMIO_t& ro_mem_device() noexcept {
             return mem_map_t::array[bit_offset
                                     / TypeTraits<reg_size>::bit_size];
         };
-        static_assert((bit_offset / 8u) <= RegisterPack::size_in_bytes,
-                      "packed register is overflowing the pack");
+        static_assert(
+            TypeTraits<reg_size>::byte_size + (bit_offset / 8u) <=
+                RegisterPack::size_in_bytes,
+            "PackRegister: packed register is overflowing the pack"
+                     );
         static_assert(
             internals::is_aligned<
                 RegisterPack::pack_base,
                 TypeTraits<reg_size>::byte_size
-                                 >::value
-            &&
+                                 >::value,
+            "PackedRegister: pack base address is mis-aligned for register type"
+                     );
+        static_assert(
             internals::is_aligned<
-                RegisterPack::pack_base + (bit_offset / 8),
+                RegisterPack::pack_base + (bit_offset / 8u),
                 TypeTraits<reg_size>::byte_size
                                  >::value,
-            "register is mis-aligned in the pack"
+            "PackedRegister: offset address is mis-aligned for register type"
                      );
     };
     template <typename... T>
@@ -516,17 +519,17 @@ namespace internals {
     template <std::size_t start, std::size_t end>
     struct for_loop {
         template <typename Func>
-        inline static void loop() {
+        inline static void loop() noexcept {
             Func().template operator()<start>();
             if (start < end)
-                for_loop<start + 1, end>::template loop<Func>();
+                for_loop<start + 1ul, end>::template loop<Func>();
         };
 #if __cplusplus >= 201402L
         template <typename Op>
-        inline static void apply(Op& f) {
+        inline static void apply(Op& f) noexcept {
             if (start < end) {
                 f(std::integral_constant<std::size_t, start>{});
-                for_loop<start + 1, end>::apply(f);
+                for_loop<start + 1ul, end>::apply(f);
             };
         };
 #endif  
@@ -534,10 +537,10 @@ namespace internals {
     template <std::size_t end>
     struct for_loop<end, end> {
         template <typename Func>
-        inline static void loop() {};
+        inline static void loop() noexcept {};
 #if __cplusplus >= 201402L
         template <typename Op>
-        inline static void apply(Op& f) {};
+        inline static void apply(Op& f) noexcept {};
 #endif  
     };
     template <typename IndexedPack>
