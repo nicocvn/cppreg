@@ -39,6 +39,7 @@ namespace cppreg {
         b64     //!< 64-bit register.
     };
 
+    
     //! Type alias field width.
     using FieldWidth_t = std::uint8_t;
 
