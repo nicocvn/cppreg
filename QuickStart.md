@@ -76,8 +76,8 @@ struct Peripheral {
     // Define the setup register and the fields.
     struct Setup : PackedRegister<
         periph_pack,                // Pack to which the register belongs to.
-        0,                          // Offset in bits from the base.
-        8                           // Register width in bits 
+        RegBitSize::b8,             // Register size. 
+        0                           // Offset in bits from the base.
     > {
     
         // When defining a Field-based type:
@@ -94,8 +94,8 @@ struct Peripheral {
     // Define the RX data register.
     struct RX : PackedRegister<
         periph_pack,                // Pack to which the register belongs to.
-        8,                          // Offset in bits from the base.
-        8                           // Register width in bits 
+        RegBitSize::b8,             // Register width in bits 
+        8                           // Offset in bits from the base.
     > {
         using Data = Field<RX, 8u, 0u, read_only>;
     };
@@ -103,8 +103,8 @@ struct Peripheral {
     // Define the RX data register.
     struct TX : PackedRegister<
         periph_pack,                // Pack to which the register belongs to.
-        8 * 2,                      // Offset in bits from the base.
-        8                           // Register width in bits 
+        RegBitSize::b8,             // Register width in bits 
+        8 * 2                       // Offset in bits from the base.
     > {
         using Data = Field<TX, 8u, 0u, read_only>;
     };
@@ -229,25 +229,25 @@ namespace gpio {
 
     // Register pack.
     // 6 x 32-bits = 6 x 4 bytes.
-    using gpio_pack = RegisterPack<0xF4000000, 6 * 4>;
+    using gpio_pack = RegisterPack<0xF4000000, 6 * 8>;
     
     // Data output register (PDOR).
-    using pdor = PackedRegister<gpio_pack, 0 * 32, 32u>;
+    using pdor = PackedRegister<gpio_pack, RegBitSize::b32, 0 * 32>;
 
     // Set output register (PSOR).
-    using psor = PackedRegister<gpio_pack, 1 * 32, 32u>;
+    using psor = PackedRegister<gpio_pack, RegBitSize::b32, 1 * 32>;
 
     // Clear output register (PCOR).
-    using pcor = PackedRegister<gpio_pack, 2 * 32, 32u>;
+    using pcor = PackedRegister<gpio_pack, RegBitSize::b32, 2 * 32>;
 
     // Toggle output register (PTOR).
-    using ptor = PackedRegister<gpio_pack, 3 * 32, 32u>;
+    using ptor = PackedRegister<gpio_pack, RegBitSize::b32, 3 * 32>;
 
     // Data input register.
-    using pdir = PackedRegister<gpio_pack, 4 * 32, 32u>;
+    using pdir = PackedRegister<gpio_pack, RegBitSize::b32, 4 * 32>;
 
     // Data direction output register.
-    using pddr = PackedRegister<gpio_pack, 5 * 32, 32u>;
+    using pddr = PackedRegister<gpio_pack, RegBitSize::b32, 5 * 32>;
 
 }
 ```
