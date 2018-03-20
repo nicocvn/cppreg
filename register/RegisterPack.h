@@ -136,9 +136,18 @@ namespace cppreg {
      */
     template <typename... T>
     struct PackIndexing {
+
+        //! Tuple type.
         using tuple_t = typename std::tuple<T...>;
+
+        //! Number of elements.
+        constexpr static const std::size_t n_elems =
+            std::tuple_size<tuple_t>::value;
+
+        //! Element accessor.
         template <std::size_t N>
-        using regs = typename std::tuple_element<N, tuple_t>::type;
+        using elem = typename std::tuple_element<N, tuple_t>::type;
+
     };
 
 
@@ -157,10 +166,10 @@ namespace cppreg {
          * This will call Op for the range [start, end).
          */
         template <typename Func>
-        inline static void loop() noexcept {
+        inline static void apply() noexcept {
             Func().template operator()<start>();
             if (start < end)
-                for_loop<start + 1ul, end>::template loop<Func>();
+                for_loop<start + 1ul, end>::template apply<Func>();
         };
 
 #if __cplusplus >= 201402L
@@ -175,10 +184,10 @@ namespace cppreg {
          * use lambda [](auto index) { index.value will be the loop index};
          */
         template <typename Op>
-        inline static void apply(Op& f) noexcept {
+        inline static void apply(Op&& f) noexcept {
             if (start < end) {
                 f(std::integral_constant<std::size_t, start>{});
-                for_loop<start + 1ul, end>::apply(f);
+                for_loop<start + 1ul, end>::apply(std::forward<Op>(f));
             };
         };
 #endif  // __cplusplus 201402L
@@ -187,10 +196,10 @@ namespace cppreg {
     template <std::size_t end>
     struct for_loop<end, end> {
         template <typename Func>
-        inline static void loop() noexcept {};
+        inline static void apply() noexcept {};
 #if __cplusplus >= 201402L
         template <typename Op>
-        inline static void apply(Op& f) noexcept {};
+        inline static void apply(Op&& f) noexcept {};
 #endif  // __cplusplus 201402L
     };
 
@@ -200,9 +209,7 @@ namespace cppreg {
      * @tparam IndexedPack Indexed pack type.
      */
     template <typename IndexedPack>
-    struct range_loop : for_loop<
-        0, std::tuple_size<typename IndexedPack::tuple_t>::value
-                                > {};
+    struct pack_loop : for_loop<0, IndexedPack::n_elems> {};
 
 
 }

@@ -67,15 +67,11 @@ The interface is (see [RegisterPack.h](register/RegisterPack.h)):
 
     | parameter            | description                                |
     |:---------------------|:-------------------------------------------|
-    | `pack_type`  | starting address of the pack memory region |
-    | `RegBitSize_value` | size in bytes of the pack memory region    |
-    | `RegBitSize_value` | size in bytes of the pack memory region    |
-
-    * `pack_type` is the `RegisterPack` type to which the register belongs,
-    * `RegBitSize_value` is the register size a `RegBitSize` value,
-    * `offet_in_bits` is the offset in bits with the respect to the pack base address,
-    * `reset_value` is the register reset value (defaulted to zero),
-    * `use_shadow_value` is a boolean indicating if a shadow value should be used (see below).
+    | `pack_type`          | starting address of the pack memory region |
+    | `RegBitSize_value`   | size in bytes of the pack memory region    |
+    | `offset_in_bits`     | offset in bits wrt pack base address       |
+    | `reset_value`        | register reset value (defaulted to zero)   |
+    | `use_shadow_value`   | enable shadow value if `true` (see below)  |
 
 Note that, the reset value is only useful when a shadow value is used.
 
@@ -116,17 +112,19 @@ There are a few requirements for when defining packed registers:
 * for a register of size N bits, the pack base address plus the offset has to be aligned on a N bits boundary,
 * the offset plus the size of register should be less or equal to the size of the pack.
 
-These requirements are enforced at compile time and errors will occur if there are not met.
+These requirements are enforced at compile time and errors will be generated if there are not met.
 
 ### Standalone register interface ###
 The interface for standalone register is (see [Register.h](register/Register.h)):
 
 `struct Register<register_address, RegBitSize_value, reset_value, use_shadow_value>`:
 
-* `register_address` is the absolute address of the register,
-* `RegBitSize_value` is the register size a `RegBitSize` value,
-* `reset_value` is the register reset value (defaulted to zero),
-* `use_shadow_value` is a boolean indicating if a shadow value should be used (see below).
+| parameter            | description                                |
+|:---------------------|:-------------------------------------------|
+| `register_address`   | register absolute address                  |
+| `RegBitSize_value`   | size in bytes of the pack memory region    |
+| `reset_value`        | register reset value (defaulted to zero)   |
+| `use_shadow_value`   | enable shadow value if `true` (see below)  |
 
 Note that, the reset value is only useful when a shadow value is used.
 
@@ -136,10 +134,103 @@ For example, consider a 32-bit register `SomeRegister` mapped at `0x40004242`. T
 using SomeRegister = Register<0x40004242, RegBitSize::b32>;
 
 // Strictly equivalent formulation:
-// struct PeripheralRegister : Register<0x40004242, 32u> {};
+// struct PeripheralRegister : Register<0x40004242, RegBitSize::b32> {};
 ```
 
-Similarly to the packed register interface, for a N bits register the address is required to be aligned on a N bits boundary. This requirement is enforced at compile time and will generate an error if not met.
+Similarly to the packed register interface, for a N bits register the address is required to be aligned on a N bits boundary. This requirement is enforced at compile time and an error will be generated if not met.
+
+### Register pack goodies ###
+`cppreg` provides a few additional goodies to simplify register packs usage. Let's consider the following peripheral with four registers, each containing a single read/write `Data`field:
+
+```c++
+struct Peripheral {
+
+    // Define a register pack:
+    // - starting at address 0xA4000000,
+    // - with a size of 4 bytes.
+    using Pack = RegisterPack<0xA4000000, 4>;
+    
+    // Registers and fields:
+    struct Channel0 : PackedRegister<Pack, RegBistSize::b8, 8 * 0> {
+        using Data = Field<Channel0, 8u, 0u, read_write>;
+    };
+    struct Channel1 : PackedRegister<Pack, RegBistSize::b8, 8 * 1> {
+        using Data = Field<Channel0, 8u, 0u, read_write>;
+    };
+    struct Channel2 : PackedRegister<Pack, RegBistSize::b8, 8 * 2> {
+        using Data = Field<Channel0, 8u, 0u, read_write>;
+    };
+    struct Channel3 : PackedRegister<Pack, RegBistSize::b8, 8 * 3> {
+        using Data = Field<Channel0, 8u, 0u, read_write>;
+    };
+    
+}
+```
+
+`PackIndexing` can be used to easily access field in packed registers using indexes:
+
+```c++
+// Map indexes.
+using Channels = PackIndexing<
+    Peripheral::Channel0::Data,
+    Peripheral::Channel1::Data,
+    Peripheral::Channel2::Data,
+    Peripheral::Channel3::Data
+>;
+
+// Read some data.
+const auto x0 = Channels::elem<0>::read();
+const auto x1 = Channels::elem<1>::read();
+const auto x2 = Channels::elem<2>::read();
+const auto x3 = Channels::elem<3>::read();
+```
+
+`cppreg` also provides a template-based for loop implementation to simplify such iterations:
+
+```c++
+// Map indexes.
+using Channels = PackIndexing<
+    Peripheral::Channel0::Data,
+    Peripheral::Channel1::Data,
+    Peripheral::Channel2::Data,
+    Peripheral::Channel3::Data
+>;
+
+// Define a functor structure to collect data.
+static std::array<std::uint8_t, Channels::n_elems> some_buffer = {};
+struct ChannelsCollector {
+   template <std::size_t index>
+   void operator()() {
+       some_buffer[index] = Channels::elem<index>::read();
+   };
+};
+
+// Iterate over the pack.
+pack_loop<Channels>::apply<ChannelsCollector>();
+```
+
+If C++14 is used, another version of the loop is also available that makes it possible to use polymorphic lambdas:
+
+```c++
+// Map indexes.
+using Channels = PackIndexing<
+    Peripheral::Channel0::Data,
+    Peripheral::Channel1::Data,
+    Peripheral::Channel2::Data,
+    Peripheral::Channel3::Data
+>;
+
+// Define a buffer to collect data.
+static std::array<std::uint8_t, Channels::n_elems> some_buffer = {};
+
+// Iterate over the pack and use a lambda.
+// Note the "auto index" ... this is required because the loop will
+// use std::integral_constant to pass the index while iterating.
+pack_loop<Channels>::apply<ChannelsCollector>([](auto index) {
+    some_buffer[index] = Channels::elem<index>::read();
+    Channels::elem<index>::template write<index>();
+});
+```
 
 
 ## Field interface ##
@@ -147,10 +238,12 @@ The `Field` template type provided by `cppreg` (see [Field.h](register/Field.h))
 
 `struct Field<register, width_in_bits, offset_in_bits, access_policy>`:
 
-* `register` is the register type to which the field belongs,
-* `width_in_bits` is the number of bits in the field,
-* `offset_in_bits`is the field offset in bits with respect to the register address,
-* `access_policy` is a type describing the read/write access to the field.
+| parameter            | description                                |
+|:---------------------|:-------------------------------------------|
+| `register`           | register type owning the field             |
+| `width_in_bits`      | width in bits (*i.e.*, size)               |
+| `offset_in_bits`     | offset in bits wrt to register address     |
+| `access_policy`      | access policy type (see below)             |
 
 Compile-time errors will be generated if the field width and offset are not consistent with the parent register size.
 
@@ -163,7 +256,7 @@ The last template parameter of a `Field`-based type describes the access policy 
 
 Depending on the access policy, the `Field`-based type will provide accessors and/or modifier to its data as described by the following table:
 
-| Method        | R/W       | RO        | WO        | Description                                           |
+| method        | R/W       | RO        | WO        | description                                           |
 |:--------------|:---------:|:---------:|:---------:| :-----------------------------------------------------|
 | `read()`      | YES       | YES       | NO        | return the content of the field                       |
 | `write(value)`| YES       | NO        | YES       | write `value` to the field                            |
@@ -263,7 +356,7 @@ This shows two issues:
 * the default `write` implementation for a write-only field will wipe out the register bits that are not part of the field,
 * when writing to the read-write field it wipes out the write-only field because there is no way to retrieve the value that was previously written.
 
-On the other hand, if we were considering an example where a single write-only field extend over an entire register (see the GPIO example in the [quick start](QuickStart.md) documentation) there will be no issue.
+On the other hand, if we were considering an example where a single write-only field extend over an entire register there will be no issue.
 
 As a workaround, `cppreg` offers a shadow value implementation which mitigates the issue by tracking the register value. This implementation can be triggered when defining a register type by using an explicit reset value and a boolean flag:
 

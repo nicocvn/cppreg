@@ -513,23 +513,25 @@ namespace cppreg {
     template <typename... T>
     struct PackIndexing {
         using tuple_t = typename std::tuple<T...>;
+        constexpr static const std::size_t n_elems =
+            std::tuple_size<tuple_t>::value;
         template <std::size_t N>
-        using regs = typename std::tuple_element<N, tuple_t>::type;
+        using elem = typename std::tuple_element<N, tuple_t>::type;
     };
     template <std::size_t start, std::size_t end>
     struct for_loop {
         template <typename Func>
-        inline static void loop() noexcept {
+        inline static void apply() noexcept {
             Func().template operator()<start>();
             if (start < end)
-                for_loop<start + 1ul, end>::template loop<Func>();
+                for_loop<start + 1ul, end>::template apply<Func>();
         };
 #if __cplusplus >= 201402L
         template <typename Op>
-        inline static void apply(Op& f) noexcept {
+        inline static void apply(Op&& f) noexcept {
             if (start < end) {
                 f(std::integral_constant<std::size_t, start>{});
-                for_loop<start + 1ul, end>::apply(f);
+                for_loop<start + 1ul, end>::apply(std::forward<Op>(f));
             };
         };
 #endif  
@@ -537,16 +539,14 @@ namespace cppreg {
     template <std::size_t end>
     struct for_loop<end, end> {
         template <typename Func>
-        inline static void loop() noexcept {};
+        inline static void apply() noexcept {};
 #if __cplusplus >= 201402L
         template <typename Op>
-        inline static void apply(Op& f) noexcept {};
+        inline static void apply(Op&& f) noexcept {};
 #endif  
     };
     template <typename IndexedPack>
-    struct range_loop : for_loop<
-        0, std::tuple_size<typename IndexedPack::tuple_t>::value
-                                > {};
+    struct pack_loop : for_loop<0, IndexedPack::n_elems> {};
 }
 #endif  
 
