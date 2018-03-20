@@ -5,7 +5,7 @@ Copyright Sendyne Corp., 2010-2018. All rights reserved ([LICENSE](LICENSE)).
 ## Introduction ##
 `cppreg` provides ways to define custom C++ data types to represent memory-mapped input/output (MMIO) registers and fields. In essence, `cppreg` does contain very little *executable* code, but it does provide a framework to efficiently manipulate MMIO registers and fields.
 
-The entire implementation is encapsulated in the `cppreg::` namespace. All the code examples assume this namespace is accessible (*i.e.*, `using namespace cppreg` is implicit).
+The entire implementation is encapsulated in the `cppreg::` namespace. All the code examples assume this namespace is accessible (*i.e.*, `using namespace cppreg;` is implicit).
 
 
 ## Overview ##
@@ -13,7 +13,7 @@ The entire implementation is encapsulated in the `cppreg::` namespace. All the c
 
 * define a pack of registers: a register pack is simply a group of registers contiguous in memory (this is often the case when dealing with registers associated with a peripheral),
 * define single register at a specific memory address: this is provided as a fallback when the register pack implementation cannot be used,
-* define fields within registers (packed or not): a field corresponds to a group of bits within a register and comes with a specific access policy which control read and write accesses.
+* define fields within registers (packed or not): a field corresponds to a group of bits within a register and comes with a specific access policy which control read and write access.
 
 The API was designed such that `cppreg`-based code is safer and more expressive than traditional low-level code while providing the same level of performance.
 
@@ -28,14 +28,14 @@ As explained below, when using `cppreg`, registers and fields are defined as C++
 * `FieldWidth_t` and `FieldOffset_t` are the data types to represent field sizes and offsets; both are equivalent to `std::uint8_t`.
 
 ### Register size ###
-The `RegBitSize` enumeration type represents the register sizes supported in `cppreg` and the various values are:
+The `RegBitSize` enumeration type represents the register sizes supported in `cppreg` and the values are:
 
 * `RegBitSize::b8` for 8-bit registers,
 * `RegBitSize::b16` for 16-bit registers,
 * `RegBitSize::b32` for 32-bit registers,
 * `RegBitSize::b64` for 64-bit registers.
 
-The register size is used to define the C++ data type that represent the register content in [Traits.h](TypeTraits.h).
+The register size is used to define the C++ data type that represent the register content in [Traits.h](Traits.h).
 
 
 ## Register interface ##
@@ -46,7 +46,7 @@ In `cppreg`, registers are represented as memory locations that contain fields, 
 
 Most of the times registers are part of groups related to peripherals or specific functionalities within a MCU. It is therefore recommended to use the register pack implementation rather than the standalone one. This ensures that the assembly generated from `cppreg`-based code will be optimal. In other words, the difference between packed registers and standalone registers is only a matter of performance in the generated assembly: the packed register interface relies on mapping an array on the pack memory region, which provides to the compiler the ability to use offset between the various registers versus reloading their absolute addresses.
 
-Moreover, the same level of functionality is provided by both implementations (`RegisterPack` is simply deriving from `Register` and overriding accessor and modifier methods). That is, a packed register type can be replaced by a standalone register type (and *vice versa*).
+Moreover, the same level of functionality is provided by both implementations (`RegisterPack` is simply deriving from `Register` and redefining accessor and modifier methods). That is, a packed register type can be replaced by a standalone register type (and *vice versa*).
 
 ### Register pack interface ###
 To define a pack of registers:
@@ -54,15 +54,22 @@ To define a pack of registers:
 1. define a `RegisterPack` type with the base address of the pack and the number of bytes,
 2. define `PackedRegister` types for all the registers in the pack.
 
-
 The interface is (see [RegisterPack.h](register/RegisterPack.h)):
 
 * `struct RegisterPack<pack_base_address, pack_size_in_bytes>`:
 
-    * `pack_base_address` is the starting address of the memory region that contains all the registers of the pack,
-    * `pack_size_in_bytes` is the size in bytes of the said memory region.
+    | parameter            | description                                |
+    |:---------------------|:-------------------------------------------|
+    | `pack_base_address`  | starting address of the pack memory region |
+    | `pack_size_in_bytes` | size in bytes of the pack memory region    |
 
 * `struct PackedRegister<pack_type, RegBitSize_value, offset_in_bits, reset_value, use_shadow_value>`:
+
+    | parameter            | description                                |
+    |:---------------------|:-------------------------------------------|
+    | `pack_type`  | starting address of the pack memory region |
+    | `RegBitSize_value` | size in bytes of the pack memory region    |
+    | `RegBitSize_value` | size in bytes of the pack memory region    |
 
     * `pack_type` is the `RegisterPack` type to which the register belongs,
     * `RegBitSize_value` is the register size a `RegBitSize` value,

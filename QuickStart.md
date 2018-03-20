@@ -28,7 +28,7 @@ There are two recommended ways to use `cppreg` in a project:
 
 
 ### Recommended compiler settings ###
-Although `cppreg` is entirely written in C++, there is little (if any) overhead in term of runtime performance if at least some level of optimization are enabled (mostly to take care of inlining). For GCC ARM the following settings are recommended (and similar settings should be used for other compilers): 
+Although `cppreg` is entirely written in C++, there is little (if any) overhead in term of runtime performance if at least some level of optimization are enabled (mostly to take care of inlining). For GCC/Clang the following settings are recommended (and similar settings should be used for other compilers): 
 
 * enable `-Og` for debug builds (this helps significantly with inlining),
 * for optimized builds (`-O2`,`-O3` or `-Os`) the default settings will be sufficient,
@@ -36,7 +36,7 @@ Although `cppreg` is entirely written in C++, there is little (if any) overhead 
 
 
 ## Prologue ##
-When developing firmware code for embedded MCUs it is customary that peripherals and devices are configured and operated through MMIO registers (for example, a UART or GPIO peripheral). For a given peripheral the related registers are grouped together at a specific location in memory. `cppreg` makes it possible to *map* C++ constructs to such peripherals and registers in order to get safer and more expressive code. The following two examples illustrate how to define such constructs using `cppreg`.
+When developing firmware code for embedded MCUs it is customary that peripherals and devices are configured and operated through MMIO registers (for example, a UART or GPIO peripheral). For a given peripheral the related registers are often grouped together at a specific location in memory. `cppreg` makes it possible to *map* C++ constructs to such peripherals registers and fields in order to get safer and more expressive code. The following two examples illustrate how to define such constructs using `cppreg`.
 
 
 ## Example: peripheral setup ##
@@ -106,7 +106,7 @@ struct Peripheral {
         RegBitSize::b8,             // Register width in bits 
         8 * 2                       // Offset in bits from the base.
     > {
-        using Data = Field<TX, 8u, 0u, read_only>;
+        using Data = Field<TX, 8u, 0u, write_only>;
     };
 
 };
@@ -118,7 +118,8 @@ Now let's assume that we want to setup and enable the peripheral following the p
 
 1. we first set the mode, say with value `0x2`,
 2. then the frequency, say with value `0x1A`,
-3. then write `1` to the enable field to start the peripheral.
+3. then write `1` to the enable field to start the peripheral,
+4. if the peripheral fails to start or stop this will be set to zero.
 
 Once enabled we also want to implement a echo loop that will simply read data from the RX register and put them in the TX register so that the peripheral will echo whatever it receives.
 
@@ -130,13 +131,13 @@ Peripheral::Setup::Mode::write<0x2>();
 Peripheral::Setup::Frequency::write<0x1A>();
 Peripheral::Setup::Enable::set();
 
-// Check if properly enabled.
-if (!Peripheral::Setup::Enable::is_set()) {
-    // Peripheral failed to start ...
-};
-
 // Echo loopback.
 while (true) {
+
+    // Check if sill enabled.
+    if (!Peripheral::Setup::Enable::is_set()) {
+        break;
+    };
 
     // Read data.
     const auto incoming_data = Peripheral::RX::Data::read();
@@ -175,11 +176,6 @@ We can even add more expressive methods for our peripheral:
 // Peripheral register.
 struct PeripheralInterface : Peripheral {
     
-    // To enable the peripheral:
-    // write 1 to EN field; if the peripheral fails to start this will be reset to zero.
-    // To disable the peripheral:
-    // clear EN field; no effect if not enabled.
-    
     // Configuration with mode and frequency.
     template <Mode::type mode, Frequency::type f>
     inline static void configure() {
@@ -191,6 +187,11 @@ struct PeripheralInterface : Peripheral {
     // Enable method.
     inline static void enable() {
         Enable::set();
+    };
+    
+    // Is enabled method.
+    inline static bool is_enabled() {
+        return Enable::is_set();
     };
     
     // Disable method.
@@ -265,10 +266,10 @@ namespace leds {
         // Define the relevant fields.
         // Some of these fields are write only (e.g., PSOR) but we define them
         // as read write (it will always read zero but we will not read them).
-        using pin_direction = Field<gpio::pddr, 1u, Pin, AccessPolicy::rw>;
-        using pin_set = Field<gpio::psor, 1u, Pin, AccessPolicy::rw>;
-        using pin_clear = Field<gpio::pcor, 1u, Pin, AccessPolicy::rw>;
-        using pin_toggle = Field<gpio::ptor, 1u, Pin, AccessPolicy::rw>;
+        using pin_direction = Field<gpio::pddr, 1u, Pin, read_write>;
+        using pin_set = Field<gpio::psor, 1u, Pin, read_write>;
+        using pin_clear = Field<gpio::pcor, 1u, Pin, read_write>;
+        using pin_toggle = Field<gpio::ptor, 1u, Pin, read_write>;
 
         // We also define some constants.
         constexpr static const gpio::pddr::type pin_output_dir = 1u;
@@ -298,7 +299,7 @@ namespace leds {
 }
 ```
 
-At this point we have defined an interface to initialize and control the LEDs attached to two GPIO pins. Note that, at no moment we had to deal with masking or shifting operations. Furthermore, we only needed to deal with the register addresses when defining the mapping. At compile time, `cppreg` also makes sure that the field actually fits within the register specifications (a `Field` type cannot overflow its `Register` type). Similarly, `cppreg` also checks that packed registers are properly aligned and fit within the pack.
+At this point we have defined an interface to initialize and control the LEDs attached to two GPIO pins. Note that, at no moment we had to deal with masking or shifting operations. Furthermore, we only needed to deal with the register addresses when defining the mapping. At compile time `cppreg` also makes sure that the field actually fits within the register specifications (a `Field`-based type cannot overflow the register in which it is defined). Similarly, `cppreg` also checks that packed registers are properly aligned and fit within the pack.
 
 Using this interface it becomes easy to write very expressive code such as:
 
@@ -318,4 +319,4 @@ for (std::size_t i = 0; i < 500000; ++i)
 leds::blue::off();
 ```
 
-A quick note: in this example some of the registers are write-only (set, clear and toggle); in genereal extra care has to be taken when dealing with write-only fields or registers but for this example the implementation still work fine due to the nature of the GPIO registers. Check the [API documentation](API.md) for more details.
+A quick note: in this example some of the fields are write-only (set, clear and toggle); in general extra care has to be taken when dealing with write-only fields but for this example the implementation still work fine due to the nature of the GPIO registers. Check the [API documentation](API.md) for more details.
