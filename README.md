@@ -15,6 +15,15 @@ Copyright Sendyne Corp., 2010-2018. All rights reserved ([LICENSE](LICENSE)).
 For a short introduction and how-to see the [quick start guide](QuickStart.md). A more complete and detailed documentation is available [here](API.md).
 
 
+## Requirements ##
+`cppreg` is designed to be usable on virtually any hardware that statisfies the following requirements:
+
+* MMIO register sizes are integral numbers of bytes (*e.g.*, 8 bits, 16 bits, ...),
+* registers are properly aligned: a N-bit register is aligned on a N-bit boundary,
+
+GCC (4.8 and above) and Clang (3.3 and above) are supported and it is expected that any other C++11-compliant compiler should work (see the [quick start guide](QuickStart.md) for recommended compiler settings).
+
+
 ## Manifest ##
 This project started when looking at this type of C code:
 

@@ -18,7 +18,7 @@
 #define CPPREG_MERGEWRITE_H
 
 
-#include "Overflow.h"
+#include "Internals.h"
 #include "AccessPolicy.h"
 #include <functional>
 
@@ -46,21 +46,18 @@ namespace cppreg {
     template <
         typename Register,
         typename Register::type mask,
-        Offset_t offset,
+        FieldOffset_t offset,
         typename Register::type value
     > class MergeWrite_tmpl {
 
 
-    public:
-
-        //! Type alias to register base type.
-        using base_type = typename Register::type;
-
-
     private:
 
+        // Type alias to register base type.
+        using base_type = typename Register::type;
+
         // Disabled for shadow value register.
-        static_assert(!Register::shadow::use_shadow,
+        static_assert(!Register::shadow::value,
                       "merge write is not available for shadow value register");
 
         // Accumulated value.
@@ -94,8 +91,8 @@ namespace cppreg {
         inline void done() const && noexcept {
 
             // Get memory pointer.
-            typename Register::MMIO_t* const mmio_device =
-                Register::rw_mem_pointer();
+            typename Register::MMIO_t& mmio_device =
+                Register::rw_mem_device();
 
             // Write to the whole register using the current accumulated value
             // and combined mask.
@@ -130,12 +127,21 @@ namespace cppreg {
         inline
         typename std::enable_if<
             (internals::check_overflow<
-                Register::size, new_value, (F::mask >> F::offset)
-                                      >::result::value),
+                typename Register::type, new_value, (F::mask >> F::offset)
+                                      >::value),
             T
                                >::type&&
         with() const && noexcept {
+
+            // Check that the field belongs to the register.
+            static_assert(std::is_same<
+                              typename F::parent_register,
+                              Register
+                                      >::value,
+                          "field is not from the same register in merge_write");
+
             return std::move(T::make());
+
         };
 
 
@@ -193,8 +199,8 @@ namespace cppreg {
         inline void done() const && noexcept {
 
             // Get memory pointer.
-            typename Register::MMIO_t* const mmio_device =
-                Register::rw_mem_pointer();
+            typename Register::MMIO_t& mmio_device =
+                Register::rw_mem_device();
 
             // Write to the whole register using the current accumulated value
             // and combined mask.
@@ -231,7 +237,7 @@ namespace cppreg {
                 base_type,
                 F::mask,
                 F::offset
-                                     >(&_accumulated_value, value);
+                                     >(_accumulated_value, value);
 
             return
                 std::move(
@@ -245,7 +251,7 @@ namespace cppreg {
     private:
 
         // Disabled for shadow value register.
-        static_assert(!Register::shadow::use_shadow,
+        static_assert(!Register::shadow::value,
                       "merge write is not available for shadow value register");
 
         // Private default constructor.

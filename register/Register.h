@@ -23,10 +23,10 @@ namespace cppreg {
 
     //! Register data structure.
     /**
-     * @tparam address Register address.
-     * @tparam width Register total width (i.e., size).
-     * @tparam reset Register reset value (0x0 if unknown).
-     * @tparam shadow Boolean flag to enable shadow value (enabled if `true`).
+     * @tparam reg_address Register address.
+     * @tparam reg_size Register size enum value.
+     * @tparam reset_value Register reset value (0x0 if unknown).
+     * @tparam use_shadow shadow Boolean flag to enable shadow value.
      *
      * This data structure will act as a container for fields and is
      * therefore limited to a strict minimum. It only carries information
@@ -35,45 +35,46 @@ namespace cppreg {
      * create custom types.
      */
     template <
-        Address_t RegAddress,
-        Width_t RegWidth,
-        typename RegisterType<RegWidth>::type ResetValue = 0x0,
-        bool UseShadow = false
+        Address_t reg_address,
+        RegBitSize reg_size,
+        typename TypeTraits<reg_size>::type reset_value = 0x0,
+        bool use_shadow = false
     >
     struct Register {
 
         //! Register base type.
-        using type = typename RegisterType<RegWidth>::type;
+        using type = typename TypeTraits<reg_size>::type;
 
         //! MMIO pointer type.
         using MMIO_t = volatile type;
 
-        //! Register base address.
-        constexpr static const Address_t base_address = RegAddress;
+        //! Boolean flag for shadow value management.
+        using shadow = Shadow<Register, use_shadow>;
 
-        //! Register total width.
-        constexpr static const Width_t size = RegWidth;
+        //! Register base address.
+        constexpr static const Address_t base_address = reg_address;
+
+        //! Register size in bits.
+        constexpr static const std::uint8_t size =
+            TypeTraits<reg_size>::bit_size;
 
         //! Register reset value.
-        constexpr static const type reset = ResetValue;
-
-        //! Boolean flag for shadow value management.
-        using shadow = Shadow<Register, UseShadow>;
+        constexpr static const type reset = reset_value;
 
         //! Memory modifier.
         /**
-         * @return A pointer to the writable register memory.
+         * @return A reference to the writable register memory.
          */
-        static MMIO_t* rw_mem_pointer() {
-            return reinterpret_cast<MMIO_t* const>(base_address);
+        static MMIO_t& rw_mem_device() {
+            return *(reinterpret_cast<MMIO_t* const>(base_address));
         };
 
         //! Memory accessor.
         /**
-         * @return A pointer to the read-only register memory.
+         * @return A reference to the read-only register memory.
          */
-        static const MMIO_t* ro_mem_pointer() {
-            return reinterpret_cast<const MMIO_t* const>(base_address);
+        static const MMIO_t& ro_mem_device() {
+            return *(reinterpret_cast<const MMIO_t* const>(base_address));
         };
 
         //! Merge write start function.
@@ -109,8 +110,8 @@ namespace cppreg {
         inline static
         typename std::enable_if<
             internals::check_overflow<
-                size, value, (F::mask >> F::offset)
-                                     >::result::value,
+                type, value, (F::mask >> F::offset)
+                                     >::value,
             T
                                >::type&&
         merge_write() noexcept {
@@ -118,8 +119,15 @@ namespace cppreg {
         };
 
         // Sanity check.
-        static_assert(RegWidth != 0u,
-                      "defining a Register type of width 0u is not allowed");
+        static_assert(size != 0u,
+                      "Register: register definition with zero size");
+
+        // Enforce alignment.
+        static_assert(
+            internals::is_aligned<reg_address, TypeTraits<reg_size>::byte_size>
+            ::value,
+            "Register: address is mis-aligned for register type"
+                     );
 
     };
 
@@ -128,6 +136,3 @@ namespace cppreg {
 
 
 #endif  // CPPREG_REGISTER_H
-
-
-

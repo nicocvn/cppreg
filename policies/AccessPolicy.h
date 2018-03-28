@@ -41,7 +41,7 @@ namespace cppreg {
      * The mask and offset are used to define a specific field within the
      * register.
      */
-    template <typename MMIO_t, typename T, T mask, Offset_t offset>
+    template <typename MMIO_t, typename T, T mask, FieldOffset_t offset>
     struct RegisterRead {
 
         //! Boolean flag for trivial implementation.
@@ -59,10 +59,10 @@ namespace cppreg {
          */
         template <typename U = void>
         inline static T read(
-            const MMIO_t* const mmio_device,
+            const MMIO_t& mmio_device,
             typename std::enable_if<!is_trivial, U*>::type = nullptr
                             ) noexcept {
-            return static_cast<T>((*mmio_device & mask) >> offset);
+            return static_cast<T>((mmio_device & mask) >> offset);
         };
 
         //! Trivial read implementation.
@@ -72,10 +72,10 @@ namespace cppreg {
          */
         template <typename U = void>
         inline static T read(
-            const MMIO_t* const mmio_device,
+            const MMIO_t& mmio_device,
             typename std::enable_if<is_trivial, U*>::type = nullptr
                             ) noexcept {
-            return static_cast<T>(*mmio_device);
+            return static_cast<T>(mmio_device);
         };
 
     };
@@ -94,7 +94,7 @@ namespace cppreg {
      * This write implementation is used only when the value to be written is
      * not a constant expression.
      */
-    template <typename MMIO_t, typename T, T mask, Offset_t offset>
+    template <typename MMIO_t, typename T, T mask, FieldOffset_t offset>
     struct RegisterWrite {
 
         //! Boolean flag for trivial implementation.
@@ -112,12 +112,12 @@ namespace cppreg {
          */
         template <typename U = void>
         inline static void write(
-            MMIO_t* const mmio_device,
+            MMIO_t& mmio_device,
             T value,
             typename std::enable_if<!is_trivial, U*>::type = nullptr
                                 ) noexcept {
-            *mmio_device = static_cast<T>(
-                (*mmio_device & ~mask) | ((value << offset) & mask)
+            mmio_device = static_cast<T>(
+                (mmio_device & ~mask) | ((value << offset) & mask)
             );
         };
 
@@ -128,11 +128,11 @@ namespace cppreg {
          */
         template <typename U = void>
         inline static void write(
-            MMIO_t* const mmio_device,
+            MMIO_t& mmio_device,
             T value,
             typename std::enable_if<is_trivial, U*>::type = nullptr
                                 ) noexcept {
-            *mmio_device = value;
+            mmio_device = value;
         };
 
     };
@@ -152,7 +152,9 @@ namespace cppreg {
      * This write implementation is used only when the value to be written is
      * a constant expression.
      */
-    template <typename MMIO_t, typename T, T mask, Offset_t offset, T value>
+    template <
+        typename MMIO_t, typename T, T mask, FieldOffset_t offset, T value
+    >
     struct RegisterWriteConstant {
 
         //! Boolean flag for trivial implementation.
@@ -169,11 +171,11 @@ namespace cppreg {
          */
         template <typename U = void>
         inline static void write(
-            MMIO_t* const mmio_device,
+            MMIO_t& mmio_device,
             typename std::enable_if<!is_trivial, U*>::type = nullptr
                                 ) noexcept {
-            *mmio_device = static_cast<T>(
-                (*mmio_device & ~mask) | ((value << offset) & mask)
+            mmio_device = static_cast<T>(
+                (mmio_device & ~mask) | ((value << offset) & mask)
             );
         };
 
@@ -183,10 +185,10 @@ namespace cppreg {
          */
         template <typename U = void>
         inline static void write(
-            MMIO_t* const mmio_device,
+            MMIO_t& mmio_device,
             typename std::enable_if<is_trivial, U*>::type = nullptr
                              ) noexcept {
-            *mmio_device = value;
+            mmio_device = value;
         };
 
     };
@@ -204,8 +206,8 @@ namespace cppreg {
          * @param mmio_device Pointer to register mapped memory.
          * @return The value at the field location.
          */
-        template <typename MMIO_t, typename T, T mask, Offset_t offset>
-        inline static T read(const MMIO_t* const mmio_device) noexcept {
+        template <typename MMIO_t, typename T, T mask, FieldOffset_t offset>
+        inline static T read(const MMIO_t& mmio_device) noexcept {
             return RegisterRead<MMIO_t, T, mask, offset>::read(mmio_device);
         };
 
@@ -224,8 +226,8 @@ namespace cppreg {
          * @param mmio_device Pointer to register mapped memory.
          * @param value Value to be written at the field location.
          */
-        template <typename MMIO_t, typename T, T mask, Offset_t offset>
-        inline static void write(MMIO_t* const mmio_device,
+        template <typename MMIO_t, typename T, T mask, FieldOffset_t offset>
+        inline static void write(MMIO_t& mmio_device,
                                  const T value) noexcept {
             RegisterWrite<MMIO_t, T, mask, offset>::write(mmio_device, value);
         };
@@ -239,8 +241,10 @@ namespace cppreg {
          * @tparam value Value to be written at the field location.
          * @param mmio_device Pointer to register mapped memory.
          */
-        template <typename MMIO_t, typename T, T mask, Offset_t offset, T value>
-        inline static void write(MMIO_t* const mmio_device) noexcept {
+        template <
+            typename MMIO_t, typename T, T mask, FieldOffset_t offset, T value
+        >
+        inline static void write(MMIO_t& mmio_device) noexcept {
             RegisterWriteConstant<MMIO_t, T, mask, offset, value>
             ::write(mmio_device);
         };
@@ -252,7 +256,7 @@ namespace cppreg {
          * @param mmio_device Pointer to register mapped memory.
          */
         template <typename MMIO_t, typename T, T mask>
-        inline static void set(MMIO_t* const mmio_device)
+        inline static void set(MMIO_t& mmio_device)
         noexcept {
             RegisterWriteConstant<MMIO_t, T, mask, 0u, mask>
             ::write(mmio_device);
@@ -266,7 +270,7 @@ namespace cppreg {
          * @param mmio_device Pointer to register mapped memory.
          */
         template <typename MMIO_t, typename T, T mask>
-        inline static void clear(MMIO_t* const mmio_device)
+        inline static void clear(MMIO_t& mmio_device)
         noexcept {
             RegisterWriteConstant<MMIO_t, T, mask, 0u, ~mask>
             ::write(mmio_device);
@@ -280,9 +284,9 @@ namespace cppreg {
          * @param mmio_device Pointer to register mapped memory.
          */
         template <typename MMIO_t, typename T, T mask>
-        inline static void toggle(MMIO_t* const mmio_device)
+        inline static void toggle(MMIO_t& mmio_device)
         noexcept {
-            *mmio_device = static_cast<T>((*mmio_device) ^ mask);
+            mmio_device = static_cast<T>((mmio_device) ^ mask);
         };
 
     };
@@ -300,8 +304,8 @@ namespace cppreg {
          * @param mmio_device Pointer to register mapped memory.
          * @param value Value to be written at the field location.
          */
-        template <typename MMIO_t, typename T, T mask, Offset_t offset>
-        inline static void write(MMIO_t* const mmio_device,
+        template <typename MMIO_t, typename T, T mask, FieldOffset_t offset>
+        inline static void write(MMIO_t& mmio_device,
                                  const T value) noexcept {
 
             // For write-only fields we can only write to the whole register.
@@ -319,8 +323,10 @@ namespace cppreg {
          * @tparam value Value to be written at the field location.
          * @param mmio_device Pointer to register mapped memory.
          */
-        template <typename MMIO_t, typename T, T mask, Offset_t offset, T value>
-        inline static void write(MMIO_t* const mmio_device) noexcept {
+        template <
+            typename MMIO_t, typename T, T mask, FieldOffset_t offset, T value
+        >
+        inline static void write(MMIO_t& mmio_device) noexcept {
 
             // For write-only fields we can only write to the whole register.
             RegisterWriteConstant<

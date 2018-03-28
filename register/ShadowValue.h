@@ -20,14 +20,12 @@ namespace cppreg {
     //! Shadow value generic implementation.
     /**
      * @tparam Register Register type.
-     * @tparam UseShadow Boolean flag indicating if shadow value is required.
+     * @tparam use_shadow Boolean flag indicating if shadow value is required.
      *
      * This implementation is for register which do not require shadow value.
      */
-    template <typename Register, bool UseShadow>
-    struct Shadow {
-        constexpr static const bool use_shadow = false;
-    };
+    template <typename Register, bool use_shadow>
+    struct Shadow : std::false_type {};
 
 
     //! Shadow value implementation.
@@ -39,15 +37,12 @@ namespace cppreg {
      * See 
      */
     template <typename Register>
-    struct Shadow<Register, true> {
-        static typename Register::type value;
-        constexpr static const bool use_shadow = true;
+    struct Shadow<Register, true> : std::true_type {
+        static typename Register::type shadow_value;
     };
     template <typename Register>
-    typename Register::type Shadow<Register, true>::value =
+    typename Register::type Shadow<Register, true>::shadow_value =
         Register::reset;
-    template <typename Register>
-    constexpr const bool Shadow<Register, true>::use_shadow;
 
 
 }

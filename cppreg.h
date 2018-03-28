@@ -10,10 +10,11 @@
 #define CPPREG_CPPREG_H
 
 
-#include "Register.h"
-#include "Field.h"
+#include "Internals.h"
 #include "MergeWrite.h"
-#include "Overflow.h"
+#include "Register.h"
+#include "RegisterPack.h"
+#include "Field.h"
 
 
 #endif  // CPPREG_CPPREG_H

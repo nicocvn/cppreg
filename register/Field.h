@@ -39,8 +39,8 @@ namespace cppreg {
      */
     template <
         typename BaseRegister,
-        Width_t FieldWidth,
-        Offset_t FieldOffset,
+        FieldWidth_t field_width,
+        FieldOffset_t field_offset,
         typename AccessPolicy
     >
     struct Field {
@@ -58,10 +58,10 @@ namespace cppreg {
         using policy = AccessPolicy;
 
         //! Field width.
-        constexpr static const Width_t width = FieldWidth;
+        constexpr static const FieldWidth_t width = field_width;
 
         //! Field offset.
-        constexpr static const Offset_t offset = FieldOffset;
+        constexpr static const FieldOffset_t offset = field_offset;
 
         //! Field mask.
         constexpr static const type mask = make_shifted_mask<type>(width,
@@ -69,7 +69,7 @@ namespace cppreg {
 
         //! Boolean flag indicating if a shadow value is used.
         constexpr static const bool has_shadow =
-            parent_register::shadow::use_shadow;
+            parent_register::shadow::value;
 
         //! Customized overflow check implementation for Field types.
         /**
@@ -79,14 +79,11 @@ namespace cppreg {
          * This is only used for the template form of the write method.
          */
         template <type value>
-        struct check_overflow {
-            constexpr static const bool result =
-                internals::check_overflow<
-                    parent_register::size,
-                    value,
-                    (mask >> offset)
-                                         >::result::value;
-        };
+        struct check_overflow : internals::check_overflow<
+            type,
+            value,
+            (mask >> offset)
+                                                         > {};
 
         //!@ Field read method.
         /**
@@ -94,7 +91,7 @@ namespace cppreg {
          */
         inline static type read() noexcept {
             return policy::template read<MMIO_t, type, mask, offset>(
-                parent_register::ro_mem_pointer()
+                parent_register::ro_mem_device()
                                                                     );
         };
 
@@ -107,7 +104,7 @@ namespace cppreg {
         write(const typename std::enable_if<!has_shadow, T>::type value)
         noexcept {
             policy::template write<MMIO_t, type, mask, offset>(
-                parent_register::rw_mem_pointer(),
+                parent_register::rw_mem_device(),
                 value
                                                               );
         };
@@ -124,13 +121,13 @@ namespace cppreg {
             // Update shadow value.
             // This assumes that reading a write-only fields return some value.
             RegisterWrite<type, type, mask, offset>
-            ::write(&parent_register::shadow::value, value);
+            ::write(parent_register::shadow::shadow_value, value);
 
             // Write as a block to the register, that is, we do not use the
             // mask and offset.
             policy::template write<MMIO_t, type, type_mask<type>::value, 0u>(
-                parent_register::rw_mem_pointer(),
-                parent_register::shadow::value
+                parent_register::rw_mem_device(),
+                parent_register::shadow::shadow_value
                                                                             );
 
         };
@@ -147,12 +144,12 @@ namespace cppreg {
         typename std::enable_if<
             !has_shadow
             &&
-            check_overflow<value>::result,
+            check_overflow<value>::value,
             T
                                >::type
         write() noexcept {
             policy::template write<MMIO_t, type, mask, offset, value>(
-                parent_register::rw_mem_pointer()
+                parent_register::rw_mem_device()
                                                                      );
         };
 
@@ -168,13 +165,13 @@ namespace cppreg {
         typename std::enable_if<
             has_shadow
             &&
-            check_overflow<value>::result,
+            check_overflow<value>::value,
             T
                                >::type
         write() noexcept {
 
-            // For this particular we can simply forward to the non-constant
-            // implementation.
+            // For this particular we simply forward to the non-constant
+            // implementation because the shadow value needs to be updated.
             write(value);
 
         };
@@ -185,7 +182,7 @@ namespace cppreg {
          */
         inline static void set() noexcept {
             policy::template
-            set<MMIO_t, type, mask>(parent_register::rw_mem_pointer());
+            set<MMIO_t, type, mask>(parent_register::rw_mem_device());
         };
 
         //! Field clear method.
@@ -194,7 +191,7 @@ namespace cppreg {
          */
         inline static void clear() noexcept {
             policy::template
-            clear<MMIO_t, type, mask>(parent_register::rw_mem_pointer());
+            clear<MMIO_t, type, mask>(parent_register::rw_mem_device());
         };
 
         //! Field toggle method.
@@ -203,7 +200,7 @@ namespace cppreg {
          */
         inline static void toggle() noexcept {
             policy::template
-            toggle<MMIO_t, type, mask>(parent_register::rw_mem_pointer());
+            toggle<MMIO_t, type, mask>(parent_register::rw_mem_device());
         };
 
         //! Is field set bool method.
@@ -229,7 +226,7 @@ namespace cppreg {
                       "field width is larger than parent register size");
         static_assert(parent_register::size >= width + offset,
                       "offset + width is larger than parent register size");
-        static_assert(FieldWidth != 0u,
+        static_assert(width != 0u,
                       "defining a Field type of width 0u is not allowed");
 
     };
