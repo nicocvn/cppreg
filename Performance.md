@@ -4,7 +4,7 @@ Cppreg makes use of C++'s "zero overhead" [capabilities](https://www.youtube.com
 
 ## Test Setup
 
-For a test example, let's use an imaginary Cortex M0 based microcontroller with the intention of having the UART send out a small string and then toggle two LEDs (PIN1 and PIN3) after every full string transmission. Why imaginary? Because a real implimentation will be longer than most screens, but a real implimentation is provided at the end. An example will be written in C using CMSIS style, then in C++ using CPPReg, and a comparison of the assembly output of both using GCC-ARM with links to GodBolt so the examples can be fiddled with.
+For a test example, let's use an imaginary Cortex M0 based microcontroller with the intention of having the UART send out a small string and then toggle two LEDs (PIN1 and PIN3) after every full string transmission. Why imaginary? Because a real implimentation will be longer than most screens. An example will be written in C using CMSIS style, then in C++ using CPPReg, and a comparison of the assembly output of both using GCC-ARM with links to GodBolt so the examples can be fiddled with.
 
 ### Example peripheral
 
