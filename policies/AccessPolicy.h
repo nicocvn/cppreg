@@ -58,7 +58,7 @@ namespace cppreg {
          * @return The content of the register field.
          */
         template <typename U = void>
-        inline static T read(
+        static T read(
             const MMIO_t& mmio_device,
             typename std::enable_if<!is_trivial, U*>::type = nullptr
                             ) noexcept {
@@ -71,7 +71,7 @@ namespace cppreg {
          * @return The content of the register field.
          */
         template <typename U = void>
-        inline static T read(
+        static T read(
             const MMIO_t& mmio_device,
             typename std::enable_if<is_trivial, U*>::type = nullptr
                             ) noexcept {
@@ -111,7 +111,7 @@ namespace cppreg {
          * @param value Value to be written to the register field.
          */
         template <typename U = void>
-        inline static void write(
+        static void write(
             MMIO_t& mmio_device,
             T value,
             typename std::enable_if<!is_trivial, U*>::type = nullptr
@@ -127,7 +127,7 @@ namespace cppreg {
          * @param value Value to be written to the register field.
          */
         template <typename U = void>
-        inline static void write(
+        static void write(
             MMIO_t& mmio_device,
             T value,
             typename std::enable_if<is_trivial, U*>::type = nullptr
@@ -170,7 +170,7 @@ namespace cppreg {
          * @param mmio_device Pointer to the register memory device.
          */
         template <typename U = void>
-        inline static void write(
+        static void write(
             MMIO_t& mmio_device,
             typename std::enable_if<!is_trivial, U*>::type = nullptr
                                 ) noexcept {
@@ -184,7 +184,7 @@ namespace cppreg {
          * @param mmio_device Pointer to the register memory device.
          */
         template <typename U = void>
-        inline static void write(
+        static void write(
             MMIO_t& mmio_device,
             typename std::enable_if<is_trivial, U*>::type = nullptr
                              ) noexcept {
@@ -207,7 +207,7 @@ namespace cppreg {
          * @return The value at the field location.
          */
         template <typename MMIO_t, typename T, T mask, FieldOffset_t offset>
-        inline static T read(const MMIO_t& mmio_device) noexcept {
+        static T read(const MMIO_t& mmio_device) noexcept {
             return RegisterRead<MMIO_t, T, mask, offset>::read(mmio_device);
         };
 
@@ -227,7 +227,7 @@ namespace cppreg {
          * @param value Value to be written at the field location.
          */
         template <typename MMIO_t, typename T, T mask, FieldOffset_t offset>
-        inline static void write(MMIO_t& mmio_device,
+        static void write(MMIO_t& mmio_device,
                                  const T value) noexcept {
             RegisterWrite<MMIO_t, T, mask, offset>::write(mmio_device, value);
         };
@@ -244,7 +244,7 @@ namespace cppreg {
         template <
             typename MMIO_t, typename T, T mask, FieldOffset_t offset, T value
         >
-        inline static void write(MMIO_t& mmio_device) noexcept {
+        static void write(MMIO_t& mmio_device) noexcept {
             RegisterWriteConstant<MMIO_t, T, mask, offset, value>
             ::write(mmio_device);
         };
@@ -256,7 +256,7 @@ namespace cppreg {
          * @param mmio_device Pointer to register mapped memory.
          */
         template <typename MMIO_t, typename T, T mask>
-        inline static void set(MMIO_t& mmio_device)
+        static void set(MMIO_t& mmio_device)
         noexcept {
             RegisterWriteConstant<MMIO_t, T, mask, 0u, mask>
             ::write(mmio_device);
@@ -270,7 +270,7 @@ namespace cppreg {
          * @param mmio_device Pointer to register mapped memory.
          */
         template <typename MMIO_t, typename T, T mask>
-        inline static void clear(MMIO_t& mmio_device)
+        static void clear(MMIO_t& mmio_device)
         noexcept {
             RegisterWriteConstant<MMIO_t, T, mask, 0u, ~mask>
             ::write(mmio_device);
@@ -284,7 +284,7 @@ namespace cppreg {
          * @param mmio_device Pointer to register mapped memory.
          */
         template <typename MMIO_t, typename T, T mask>
-        inline static void toggle(MMIO_t& mmio_device)
+        static void toggle(MMIO_t& mmio_device)
         noexcept {
             mmio_device = static_cast<T>((mmio_device) ^ mask);
         };
@@ -305,8 +305,7 @@ namespace cppreg {
          * @param value Value to be written at the field location.
          */
         template <typename MMIO_t, typename T, T mask, FieldOffset_t offset>
-        inline static void write(MMIO_t& mmio_device,
-                                 const T value) noexcept {
+        static void write(MMIO_t& mmio_device, const T value) noexcept {
 
             // For write-only fields we can only write to the whole register.
             RegisterWrite<MMIO_t, T, type_mask<T>::value, 0u>::write(
@@ -326,7 +325,7 @@ namespace cppreg {
         template <
             typename MMIO_t, typename T, T mask, FieldOffset_t offset, T value
         >
-        inline static void write(MMIO_t& mmio_device) noexcept {
+        static void write(MMIO_t& mmio_device) noexcept {
 
             // For write-only fields we can only write to the whole register.
             RegisterWriteConstant<

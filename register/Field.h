@@ -89,7 +89,7 @@ namespace cppreg {
         /**
          * @return Field value.
          */
-        inline static type read() noexcept {
+        static type read() noexcept {
             return policy::template read<MMIO_t, type, mask, offset>(
                 parent_register::ro_mem_device()
                                                                     );
@@ -100,7 +100,7 @@ namespace cppreg {
          * @param value Value to be written to the field.
          */
         template <typename T = type>
-        inline static void
+        static void
         write(const typename std::enable_if<!has_shadow, T>::type value)
         noexcept {
             policy::template write<MMIO_t, type, mask, offset>(
@@ -114,7 +114,7 @@ namespace cppreg {
          * @param value Value to be written to the field.
          */
         template <typename T = type>
-        inline static void
+        static void
         write(const typename std::enable_if<has_shadow, T>::type value)
         noexcept {
 
@@ -140,14 +140,14 @@ namespace cppreg {
          * field and uses the constant write implementation.
          */
         template <type value, typename T = void>
-        inline static
-        typename std::enable_if<
-            !has_shadow
-            &&
-            check_overflow<value>::value,
-            T
-                               >::type
-        write() noexcept {
+        static void write(
+            typename std::enable_if<
+                !has_shadow
+                &&
+                check_overflow<value>::value,
+                T
+                                   >::type* = nullptr
+                         ) noexcept {
             policy::template write<MMIO_t, type, mask, offset, value>(
                 parent_register::rw_mem_device()
                                                                      );
@@ -161,14 +161,14 @@ namespace cppreg {
          * field and uses the constant write implementation.
          */
         template <type value, typename T = void>
-        inline static
-        typename std::enable_if<
-            has_shadow
-            &&
-            check_overflow<value>::value,
-            T
-                               >::type
-        write() noexcept {
+        static void write(
+            typename std::enable_if<
+                has_shadow
+                &&
+                check_overflow<value>::value,
+                T
+                                   >::type* = nullptr
+                         ) noexcept {
 
             // For this particular we simply forward to the non-constant
             // implementation because the shadow value needs to be updated.
@@ -180,7 +180,7 @@ namespace cppreg {
         /**
          * This method will set all bits in the field.
          */
-        inline static void set() noexcept {
+        static void set() noexcept {
             policy::template
             set<MMIO_t, type, mask>(parent_register::rw_mem_device());
         };
@@ -189,7 +189,7 @@ namespace cppreg {
         /**
          * This method will clear all bits in the field.
          */
-        inline static void clear() noexcept {
+        static void clear() noexcept {
             policy::template
             clear<MMIO_t, type, mask>(parent_register::rw_mem_device());
         };
@@ -198,7 +198,7 @@ namespace cppreg {
         /**
          * This method will toggle all bits in the field.
          */
-        inline static void toggle() noexcept {
+        static void toggle() noexcept {
             policy::template
             toggle<MMIO_t, type, mask>(parent_register::rw_mem_device());
         };
@@ -207,7 +207,7 @@ namespace cppreg {
         /**
          * @return `true` if all the bits are set to 1, `false` otherwise.
          */
-        inline static bool is_set() noexcept {
+        static bool is_set() noexcept {
             return (Field::read() == (mask >> offset));
         };
 
@@ -215,7 +215,7 @@ namespace cppreg {
         /**
          * @return `true` if all the bits are set to 0, `false` otherwise.
          */
-        inline static bool is_clear() noexcept {
+        static bool is_clear() noexcept {
             return (Field::read() == 0u);
         };
         

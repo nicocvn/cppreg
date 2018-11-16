@@ -84,7 +84,7 @@ namespace cppreg {
          * @return A merge write data structure to chain further writes.
          */
         template <typename F>
-        inline static MergeWrite<typename F::parent_register, F::mask>
+        static MergeWrite<typename F::parent_register, F::mask>
         merge_write(const typename F::type value) noexcept {
             return
                 MergeWrite<typename F::parent_register, F::mask>
@@ -107,7 +107,7 @@ namespace cppreg {
                 value
                                         >
         >
-        inline static
+        static
         typename std::enable_if<
             internals::check_overflow<
                 type, value, (F::mask >> F::offset)

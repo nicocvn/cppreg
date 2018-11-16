@@ -83,7 +83,7 @@ namespace cppreg {
         /**
          * @return A reference to the writable register memory.
          */
-        inline static typename base_reg::MMIO_t& rw_mem_device() noexcept {
+        static typename base_reg::MMIO_t& rw_mem_device() noexcept {
             return mem_map_t::array[bit_offset
                                     / TypeTraits<reg_size>::bit_size];
         };
@@ -92,7 +92,7 @@ namespace cppreg {
         /**
          * @return A reference to the read-only register memory.
          */
-        inline static const typename base_reg::MMIO_t& ro_mem_device() noexcept {
+        static const typename base_reg::MMIO_t& ro_mem_device() noexcept {
             return mem_map_t::array[bit_offset
                                     / TypeTraits<reg_size>::bit_size];
         };
@@ -166,7 +166,7 @@ namespace cppreg {
          * This will call Op for the range [start, end).
          */
         template <typename Func>
-        inline static void apply() noexcept {
+        static void apply() noexcept {
             Func().template operator()<start>();
             if (start < end)
                 for_loop<start + 1ul, end>::template apply<Func>();
@@ -184,7 +184,7 @@ namespace cppreg {
          * use lambda [](auto index) { index.value will be the loop index};
          */
         template <typename Op>
-        inline static void apply(Op&& f) noexcept {
+        static void apply(Op&& f) noexcept {
             if (start < end) {
                 f(std::integral_constant<std::size_t, start>{});
                 for_loop<start + 1ul, end>::apply(std::forward<Op>(f));
@@ -196,10 +196,10 @@ namespace cppreg {
     template <std::size_t end>
     struct for_loop<end, end> {
         template <typename Func>
-        inline static void apply() noexcept {};
+        static void apply() noexcept {};
 #if __cplusplus >= 201402L
         template <typename Op>
-        inline static void apply(Op&& f) noexcept {};
+        static void apply(Op&& f) noexcept {};
 #endif  // __cplusplus 201402L
     };
 

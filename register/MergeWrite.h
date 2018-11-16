@@ -68,13 +68,13 @@ namespace cppreg {
         constexpr static const base_type _combined_mask = mask;
 
         // Default constructor.
-        MergeWrite_tmpl() {};
+        MergeWrite_tmpl() = default;
 
 
     public:
 
         //! Instantiation method.
-        inline static MergeWrite_tmpl make() noexcept { return {}; };
+        static MergeWrite_tmpl make() noexcept { return {}; };
 
         //!@{ Non-copyable and non-moveable.
         MergeWrite_tmpl(const MergeWrite_tmpl&) = delete;
@@ -88,7 +88,7 @@ namespace cppreg {
         /**
          * This is where the write happens.
          */
-        inline void done() const && noexcept {
+        void done() const && noexcept {
 
             // Get memory pointer.
             typename Register::MMIO_t& mmio_device =
@@ -124,7 +124,6 @@ namespace cppreg {
                                                    F::mask)
                                         >
         >
-        inline
         typename std::enable_if<
             (internals::check_overflow<
                 typename Register::type, new_value, (F::mask >> F::offset)
@@ -196,7 +195,7 @@ namespace cppreg {
         /**
          * This is where the write happens.
          */
-        inline void done() const && noexcept {
+        void done() const && noexcept {
 
             // Get memory pointer.
             typename Register::MMIO_t& mmio_device =
@@ -221,8 +220,8 @@ namespace cppreg {
          * @return A reference to the current merge write data.
          */
         template <typename F>
-        inline MergeWrite<Register, _combined_mask | F::mask> with
-            (const base_type value) && noexcept {
+        MergeWrite<Register, _combined_mask | F::mask>
+        with(const base_type value) && noexcept {
 
             // Check that the field belongs to the register.
             static_assert(std::is_same<
@@ -232,12 +231,8 @@ namespace cppreg {
                           "field is not from the same register in merge_write");
 
             // Update accumulated value.
-            F::policy::template write<
-                base_type,
-                base_type,
-                F::mask,
-                F::offset
-                                     >(_accumulated_value, value);
+            _accumulated_value = (_accumulated_value & ~F::mask)
+                                 | ((value << F::offset) & F::mask);
 
             return
                 std::move(
@@ -256,7 +251,8 @@ namespace cppreg {
 
         // Private default constructor.
         constexpr MergeWrite() : _accumulated_value(0u) {};
-        constexpr MergeWrite(const base_type v) : _accumulated_value(v) {};
+        constexpr explicit MergeWrite(const base_type v) :
+            _accumulated_value(v) {};
 
         // Accumulated value.
         base_type _accumulated_value;
