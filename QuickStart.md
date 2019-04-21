@@ -1,5 +1,5 @@
 # cppreg: quick start #
-Copyright Sendyne Corp., 2010-2018. All rights reserved ([LICENSE](LICENSE)).
+Copyright Sendyne Corp., 2010-2019. All rights reserved ([LICENSE](LICENSE)).
 
 
 This document is a brief introduction to `cppreg` and how to use it. For more details about the implementation refers to the [API documentation](API.md).
@@ -14,7 +14,8 @@ There are two recommended ways to use `cppreg` in a project:
     # Include cppreg library.
     # The second argument is not necessarily required depending on the project setup.
     # This will import the cppreg target.
-    # Because cppreg is a header-only library the cppreg target is actually an INTERFACE library target.
+    # Because cppreg is a header-only library the cppreg target is actually an 
+    # INTERFACE library target.
     add_subdirectory(/path/to/cppreg ${PROJECT_BINARY_DIR)/cppreg)
     
     ...
@@ -59,7 +60,7 @@ The RX and TX data registers both contain a single DATA field occupying the whol
 The goal of `cppreg` is to facilitate the manipulation of such a peripheral. This can be done as follow:
 
 ```c++
-#include <cppreg.h> // use cppreg-all.h instead if you are using the single header.
+#include <cppreg.h> // use cppreg-all.h if you are using the single header.
 using namespace cppreg;
 
 // Peripheral structure.
@@ -150,7 +151,7 @@ while (true) {
 
 A few remarks:
 
-* the `write` calls for the `Setup` register pass the data as template arguments, while the write call for the `TX` register pass it as a function argument: if the value to be written is known at compile time it is recommended to use the template form; the template form will detect overflow (see below) and will also make it possible to use a faster write implementation in some cases,
+* the `write` calls for the `Setup` register pass the data as template arguments, while the write call for the `TX` register pass it as a function argument: if the value to be written is known at compile time it is recommended to use the template form; the template form will detect overflow (see below) and will also make it possible to use a more efficient write implementation in some cases,
 * `Field`-based types have `is_set` and `is_clear` defined to conveniently query their states.
 
 In this example, we can already see how `cppreg` limits the possibility of errors (see the [API documentation](API.md) for more details):
