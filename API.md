@@ -1,5 +1,5 @@
 # cppreg: API #
-Copyright Sendyne Corp., 2010-2018. All rights reserved ([LICENSE](LICENSE)).
+Copyright Sendyne Corp., 2010-2019. All rights reserved ([LICENSE](LICENSE)).
 
 
 ## Introduction ##
@@ -17,15 +17,15 @@ The entire implementation is encapsulated in the `cppreg::` namespace. All the c
 
 The API was designed such that `cppreg`-based code is safer and more expressive than traditional low-level code while providing the same level of performance.
 
-As explained below, when using `cppreg`, registers and fields are defined as C++ types specializing pre-defined template types. This can be done by explicitly deriving from the specialized template type or by using the `using` keyword (both approaches are strictly equivalent). With the exception of the merged write mechanism discussed below, all methods provided by the `cppreg` types are static methods. 
+As explained below, when using `cppreg`, registers and fields are defined as C++ types specializing pre-defined template types. This can be done by explicitly deriving from the specialized template type or by using the `using` keyword (both approaches are strictly equivalent). With the exception of the merged write mechanism discussed below, all methods provided by the `cppreg` types are static methods.
 
 
 ## Data types ##
 `cppreg` introduces type aliases in order to parameterize the set of data types used in the implementation. By default the following types are defined (see [cppreg_Defines.h](cppreg_Defines.h) for more details):
 
-* `Address_t` is the data type used to hold addresses of registers and fields; it is equivalent to `std::uintptr_t`,
+* `Address` is the data type used to hold addresses of registers and fields; it is equivalent to `std::uintptr_t`,
 * register sizes are represented by the enumeration type `RegBitSize`,
-* `FieldWidth_t` and `FieldOffset_t` are the data types to represent field sizes and offsets; both are equivalent to `std::uint8_t`.
+* `FieldWidth` and `FieldOffset` are the data types to represent field sizes and offsets; both are equivalent to `std::uint8_t`.
 
 ### Register size ###
 The `RegBitSize` enumeration type represents the register sizes supported in `cppreg` and the values are:
@@ -46,7 +46,7 @@ In `cppreg`, registers are represented as memory locations that contain fields, 
 
 Most of the times registers are part of groups related to peripherals or specific functionalities within a MCU. It is therefore recommended to use the register pack implementation rather than the standalone one. This ensures that the assembly generated from `cppreg`-based code will be optimal. In other words, the difference between packed registers and standalone registers is only a matter of performance in the generated assembly: the packed register interface relies on mapping an array on the pack memory region, which provides to the compiler the ability to use offset between the various registers versus reloading their absolute addresses.
 
-Moreover, the same level of functionality is provided by both implementations (`RegisterPack` is simply deriving from `Register` and redefining accessor and modifier methods). That is, a packed register type can be replaced by a standalone register type (and *vice versa*).
+Moreover, the same level of functionality is provided by both implementations (`RegisterPack` is simply deriving from `Register`). That is, a packed register type can be replaced by a standalone register type (and *vice versa*).
 
 ### Register pack interface ###
 To define a pack of registers:
@@ -73,7 +73,7 @@ The interface is (see [RegisterPack.h](register/RegisterPack.h)):
     | `reset_value`        | register reset value (defaulted to zero)   |
     | `use_shadow_value`   | enable shadow value if `true` (see below)  |
 
-Note that, the reset value is only useful when a shadow value is used.
+Note that, the reset value is only used when shadow value support is enabled.
 
 The following example defines a 4 bytes register pack starting at address 0xA4000000 and containing: two 8-bit register and a 16-bit register. The `cppreg` implementation is:
 
@@ -106,7 +106,7 @@ struct SomePeripheral {
 }
 ```
 
-There are a few requirements for when defining packed registers:
+There are a few requirements when defining packed registers:
 
 * for a register of size N bits, the pack base address has to be aligned on a N bits boundary,
 * for a register of size N bits, the pack base address plus the offset has to be aligned on a N bits boundary,
@@ -126,7 +126,7 @@ The interface for standalone register is (see [Register.h](register/Register.h))
 | `reset_value`        | register reset value (defaulted to zero)   |
 | `use_shadow_value`   | enable shadow value if `true` (see below)  |
 
-Note that, the reset value is only useful when a shadow value is used.
+Note that, the reset value is only used when shadow value support is enabled.
 
 For example, consider a 32-bit register `SomeRegister` mapped at `0x40004242`. The `Register` type is created using:
 
@@ -226,7 +226,7 @@ static std::array<std::uint8_t, Channels::n_elems> some_buffer = {};
 // Iterate over the pack and use a lambda.
 // Note the "auto index" ... this is required because the loop will
 // use std::integral_constant to pass the index while iterating.
-pack_loop<Channels>::apply<ChannelsCollector>([](auto index) {
+pack_loop<Channels>::apply([](auto index) {
     some_buffer[index] = Channels::elem<index>::read();
     Channels::elem<index>::template write<index>();
 });
@@ -305,12 +305,12 @@ SomeField::write<0xAB>();       // Template version for constant value write.
 SomeField::write(0xAB);         // Function argument version.
 ```
 
-The advantages of using the constant value version are:
+The advantages of using the constant value form are:
 
 * `cppreg` will most of the time use a faster implementation for the write operation (this is particularly true if the field spans an entire register),
 * a compile-time error will occur if the value overflow the field.
 
-Note that, even when using the non-constant value version overflow will not occur: only the bits part of the `Field`-type will be written and any data that does not fit the region of the memory assigned to the `Field`-type will not be modified. For example:
+Note that, even when using the non-constant value form overflow will not occur: only the bits fitting in the `Field`-type will be written and any data that does not fit the region of the memory assigned to the `Field`-type will not be modified. For example:
 
 ```c++
 // Register definition with nested fields definitions.
@@ -332,7 +332,7 @@ SomeRegister::Frequency::write<0x111>();
 
 
 ## Shadow value: a workaround for write-only fields ##
-Write-only fields are somewhat special as extra-care has to be taken when manipulating them. The main difficulty resides in the fact that write-only field can be read but the value obtained by reading it is fixed (*e.g.*, it always reads as zero). `cppreg` assumes that write-only fields can actually be read from; if such an access on some given architecture would trigger an error (*à la FPGA*) then `cppreg` is not a good choice to deal with write-only fields on this particular architecture.
+Write-only fields are somewhat special and extra-care has to be taken when manipulating them. The main difficulty resides in the fact that write-only field can be read but the value obtained by reading it is fixed (*e.g.* it always reads as zero). `cppreg` assumes that write-only fields can actually be read from; if such an access on some architecture would trigger an error (*à la FPGA*) then `cppreg` is not a good choice to deal with write-only fields on this particular architecture.
 
 Consider the following situation:
 
@@ -364,7 +364,7 @@ As a workaround, `cppreg` offers a shadow value implementation which mitigates t
 struct Reg : Register<
     0x40004242,         // Register address
     RegBitSize::b32,    // Register size
-    0x42u               // Register reset value
+    0x42u,              // Register reset value
     true                // Enable shadow value for the register
     >
 {
@@ -373,7 +373,7 @@ struct Reg : Register<
 };
 ```
 
-The shadow value implementation for a write-only field works as follow:
+The shadow value implementation for a write-only field works as follows:
 
 * at static initialization time, the reset value of the register owning the field is used to initialize the shadow value (the shadow value is used for the entire register content),
 * at each write access to any of the register fields, the shadow value will be updated and written to the entire register memory.
@@ -388,9 +388,9 @@ A few safety guidelines:
 
 
 ## MergeWrite: writing to multiple fields at once ##
-It is sometimes the case that multiple fields within a register needs to be written at the same time. For example, when setting the clock dividers in a MCU it is often recommended to write all their values to the corresponding register at the same time (to avoid overclocking part of the MCU).
+It is sometimes the case that multiple fields within a register needs to be written at the same time. For example, when setting the clock dividers in a MCU it is often recommended to write all their values to the corresponding register at the same time (to avoid mis-clocking part of the MCU).
 
-Consider the following setup (not so artifical; it is inspired by a real flash memory controller peripheral):
+Consider the following setup (not so artificial; it is inspired by a real flash memory controller peripheral):
 
 ```c++
 struct FlashCtrl : Register<0xF0008282, RegBitSize::b8> {
@@ -414,14 +414,14 @@ struct FlashCtrl : Register<0xF0008282, RegBitSize::b8> {
 
 Now let's assume the following scenario:
 
-1. The previous flash command failed because it attempted to write or erase in a protected section, at that point the content of the `FlashCtrl` register is `1001 XXXX` where `XXXX` is whatver value associated with the command that failed.
+1. The previous flash command failed because it attempted to write or erase in a protected section, at that point the content of the `FlashCtrl` register is `1001 XXXX` where `XXXX` is whatever value associated with the command that failed.
 2. Before we can perform a new flash command we need to clear the `ProtectionError` by writing 1 to it (otherwise the new command will not be started); so one could think about doing:
 
     ```c++
     FlashCtrl::ProtectionError::set();    // Write to ProtectionError to clear it.
     ```
 
-    however this write at `1000 XXXX | 0001 0000 = 1001 XXXX` at the register level and thus start the command that previously failed.
+    however this write `1000 XXXX | 0001 0000 = 1001 XXXX` at the register level and thus start the command that previously failed.
 3. At this point one could try to set the value for the new command but that will fail as well (because `ProtectionError` was not cleared and it is required to be).
 4. A possible alternative would be to fully zero out the `FlashCtrl` register but that would somewhat defeat the purpose of `cppreg`.
 
@@ -434,7 +434,7 @@ FlashCtrl::merge_write<FlashCtrl::ProtectionError, 0x1>().with<FlashCtrl::Comman
 
 // This will correspond to write with a mask set to 1001 0000,
 // which boils down to write (at the register level): 
-// 0000 XXXX | 0001 0000 = 0001 XXXX ... CommandComplete is not set to 1 !
+// 0000 XXXX | 0001 0000 = 0001 XXXX ... CommandComplete is not set to 1!
 ```
 
 The `merge_write` method is only available in register type (`PackedRegister` or `Register`) that do not enable the shadow value mechanism. The `Field`-based types used in the chained call are required to *be from* the register type used to call `merge_write`. In addition, the `Field`-types are also required to be writable. By design, the successive write operations have to be chained, that is, it is not possible to capture a `merge_write` context and add other write operations to it; it always has to be of the form: `register::merge_write<field1, xxx>().with<field2, xxx>(). ... .done()`.
@@ -442,4 +442,3 @@ The `merge_write` method is only available in register type (`PackedRegister` or
 **Warning:** if`done()` is not called at the end of the successive write operations no write at all will be performed.
 
 Similarly to regular write operations it is recommended to use the template version (as shown in the example) if possible: this will enable overflow checking and possibly use faster write implementations. If not possible the values to be written are passed as arguments to the various calls.
-

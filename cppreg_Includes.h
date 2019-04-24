@@ -2,7 +2,7 @@
 /**
  * @file      cppreg_Defines.h
  * @author    Nicolas Clauvelin (nclauvelin@sendyne.com)
- * @copyright Copyright 2010-2018 Sendyne Corp. All rights reserved.
+ * @copyright Copyright 2010-2019 Sendyne Corp. All rights reserved.
  */
 
 
@@ -15,4 +15,4 @@
 #include <tuple>
 
 
-#endif  // CPPREG_CPPREG_INCLUDES_H
+#endif    // CPPREG_CPPREG_INCLUDES_H
