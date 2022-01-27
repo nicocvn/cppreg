@@ -2,7 +2,7 @@
 # cppreg library CMake script
 #
 # Nicolas Clauvelin (nclauvelin@sendyne.com)
-# Sendyne Corp., 2017
+# Sendyne Corp., 2022
 #
 # -------------------------------------------------------------------------- #
 
@@ -51,6 +51,10 @@ set_property(TARGET cppreg
 
 # --- Install directives ---
 
-install(FILES ${cppreg_headers} DESTINATION include/cppreg)
-install(TARGETS cppreg DESTINATION lib EXPORT cppreg-target)
-install(EXPORT cppreg-target DESTINATION include/cppreg)
+set(include_dest "include/cppreg")
+
+install(FILES ${cppreg_headers} DESTINATION ${include_dest})
+install(TARGETS cppreg DESTINATION lib EXPORT cppreg-cmake)
+install(EXPORT cppreg-cmake
+        DESTINATION ${include_dest}
+        NAMESPACE cppreg::)
