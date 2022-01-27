@@ -232,6 +232,12 @@ pack_loop<Channels>::apply([](auto index) {
 });
 ```
 
+### Accessing registers memory ###
+The register memory can be accessed directly using the static methods:
+
+- `rw_mem_device()` for read/write access.
+- `ro_mem_devices` for read-only access.
+
 
 ## Field interface ##
 The `Field` template type provided by `cppreg` (see [Field.h](register/Field.h)) contains the added value of the library in terms of type safety, efficiency and expression of intent. The interface is:
