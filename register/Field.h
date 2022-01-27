@@ -2,7 +2,7 @@
 /**
  * @file      Field.h
  * @author    Nicolas Clauvelin (nclauvelin@sendyne.com)
- * @copyright Copyright 2010-2019 Sendyne Corp. All rights reserved.
+ * @copyright Copyright 2010-2022 Sendyne Corp. All rights reserved.
  *
  * This header provides the definitions related to register field
  * implementation. Strictly speaking a field is defined as a region of a
@@ -43,16 +43,16 @@ template <typename BaseRegister,
 struct Field {
 
     //! Parent register for the field.
-    using parent_register = BaseRegister;
+    using parent_register = BaseRegister;    // NOLINT
 
     //! Field data type derived from register data type.
-    using type = typename parent_register::type;
+    using type = typename parent_register::type;    // NOLINT
 
     //! MMIO type.
-    using MMIO = typename parent_register::MMIO;
+    using MMIO = typename parent_register::MMIO;    // NOLINT
 
     //! Field policy.
-    using policy = AccessPolicy;
+    using policy = AccessPolicy;    // NOLINT
 
     //! Field width.
     constexpr static auto width = field_width;
@@ -65,10 +65,10 @@ struct Field {
 
     //!@{ Helpers for write method selection based on shadow value.
     template <type value, typename T>
-    using if_no_shadow =
+    using if_no_shadow =    // NOLINT
         typename std::enable_if<!parent_register::shadow::value, T>::type;
     template <type value, typename T>
-    using if_shadow =
+    using if_shadow =    // NOLINT
         typename std::enable_if<parent_register::shadow::value, T>::type;
     //!@}
 
@@ -118,7 +118,7 @@ struct Field {
      * field and uses the constant write implementation.
      */
     template <type value, typename T = void>
-    static void write(if_no_shadow<value, T>* = nullptr) noexcept {
+    static void write(if_no_shadow<value, T>* = nullptr) noexcept {    // NOLINT
         policy::template write<MMIO, type, mask, offset, value>(
             parent_register::rw_mem_device());
 
@@ -136,7 +136,7 @@ struct Field {
      * field and uses the constant write implementation.
      */
     template <type value, typename T = void>
-    static void write(if_shadow<value, T>* = nullptr) noexcept {
+    static void write(if_shadow<value, T>* = nullptr) noexcept {    // NOLINT
         // For this one we simply forward to the non-constant
         // implementation because the shadow value needs to be updated.
         write(value);

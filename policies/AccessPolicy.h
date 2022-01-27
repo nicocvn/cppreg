@@ -2,7 +2,7 @@
 /**
  * @file      AccessPolicy.h
  * @author    Nicolas Clauvelin (nclauvelin@sendyne.com)
- * @copyright Copyright 2010-2019 Sendyne Corp. All rights reserved.
+ * @copyright Copyright 2010-2022 Sendyne Corp. All rights reserved.
  *
  * Access policies are used to describe if register fields are read-write,
  * read-only or write-only.
@@ -39,7 +39,7 @@ namespace cppreg {
  * @tparam offset Offset for the read operation.
  */
 template <typename T, T mask, FieldOffset offset>
-struct is_trivial_rw
+struct is_trivial_rw    // NOLINT
     : std::integral_constant<bool,
                              (mask == type_mask<T>::value)
                                  && (offset == FieldOffset{0})> {};
@@ -52,7 +52,7 @@ struct is_trivial_rw
  * @tparam U Enabled type if trivial.
  */
 template <typename T, T mask, FieldOffset offset, typename U>
-using is_trivial =
+using is_trivial =    // NOLINT
     typename std::enable_if<is_trivial_rw<T, mask, offset>::value, U>::type;
 
 //! Non-trivial read/write enable_if helper.
@@ -63,7 +63,7 @@ using is_trivial =
  * @tparam U Enabled type if non-trivial.
  */
 template <typename T, T mask, FieldOffset offset, typename U>
-using is_not_trivial =
+using is_not_trivial =    // NOLINT
     typename std::enable_if<!is_trivial_rw<T, mask, offset>::value, U>::type;
 
 //!@}
@@ -85,9 +85,10 @@ struct RegisterRead {
      * @return The content of the register field.
      */
     template <typename U = void>
-    static T read(const MMIO& mmio_device,
+    static T read(const MMIO& mmio_device,    // NOLINTNEXTLINE
                   is_not_trivial<T, mask, offset, U>* = nullptr) noexcept {
-        return static_cast<T>((mmio_device & mask) >> offset);
+        const auto lhs = static_cast<T>(mmio_device & mask);
+        return static_cast<T>(lhs >> offset);
     }
 
     //! Trivial read implementation.
@@ -96,7 +97,7 @@ struct RegisterRead {
      * @return The content of the register field.
      */
     template <typename U = void>
-    static T read(const MMIO& mmio_device,
+    static T read(const MMIO& mmio_device,    // NOLINTNEXTLINE
                   is_trivial<T, mask, offset, U>* = nullptr) noexcept {
         return static_cast<T>(mmio_device);
     }
@@ -120,10 +121,12 @@ struct RegisterWrite {
      */
     template <typename U = void>
     static void write(MMIO& mmio_device,
-                      T value,
+                      T value,    // NOLINTNEXTLINE
                       is_not_trivial<T, mask, offset, U>* = nullptr) noexcept {
-        mmio_device =
-            static_cast<T>((mmio_device & ~mask) | ((value << offset) & mask));
+        const auto shifted_value = static_cast<T>(value << offset);
+        const auto lhs = static_cast<T>(mmio_device & static_cast<T>(~mask));
+        const auto rhs = static_cast<T>(shifted_value & mask);
+        mmio_device = static_cast<T>(lhs | rhs);
     }
 
     //! Trivial write implementation.
@@ -133,7 +136,7 @@ struct RegisterWrite {
      */
     template <typename U = void>
     static void write(MMIO& mmio_device,
-                      T value,
+                      T value,    // NOLINTNEXTLINE
                       is_trivial<T, mask, offset, U>* = nullptr) noexcept {
         mmio_device = value;
     }
@@ -156,10 +159,12 @@ struct RegisterWriteConstant {
      * @param mmio_device Pointer to the register memory device.
      */
     template <typename U = void>
-    static void write(MMIO& mmio_device,
+    static void write(MMIO& mmio_device,    // NOLINTNEXTLINE
                       is_not_trivial<T, mask, offset, U>* = nullptr) noexcept {
-        mmio_device =
-            static_cast<T>((mmio_device & ~mask) | ((value << offset) & mask));
+        constexpr auto shifted_value = static_cast<T>(value << offset);
+        const auto lhs = static_cast<T>(mmio_device & static_cast<T>(~mask));
+        constexpr auto rhs = static_cast<T>(shifted_value & mask);
+        mmio_device = static_cast<T>(lhs | rhs);
     }
 
     //! Trivial write implementation.
@@ -167,7 +172,7 @@ struct RegisterWriteConstant {
      * @param mmio_device Pointer to the register memory device.
      */
     template <typename U = void>
-    static void write(MMIO& mmio_device,
+    static void write(MMIO& mmio_device,    // NOLINTNEXTLINE
                       is_trivial<T, mask, offset, U>* = nullptr) noexcept {
         mmio_device = value;
     }
@@ -175,7 +180,7 @@ struct RegisterWriteConstant {
 
 
 //! Read-only access policy.
-struct read_only {
+struct read_only {    // NOLINT
 
     //! Read access implementation.
     /**
@@ -194,7 +199,7 @@ struct read_only {
 
 
 //! Read-write access policy.
-struct read_write : read_only {
+struct read_write : read_only {    // NOLINT
 
     //! Write access implementation.
     /**
@@ -267,7 +272,7 @@ struct read_write : read_only {
 
 
 //! Write-only access policy.
-struct write_only {
+struct write_only {    // NOLINT
 
     //! Write access implementation.
     /**

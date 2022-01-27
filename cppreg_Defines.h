@@ -2,7 +2,7 @@
 /**
  * @file      cppreg_Defines.h
  * @author    Nicolas Clauvelin (nclauvelin@sendyne.com)
- * @copyright Copyright 2010-2019 Sendyne Corp. All rights reserved.
+ * @copyright Copyright 2010-2022 Sendyne Corp. All rights reserved.
  *
  * This header mostly defines data types used across the project. These data
  * types have been defined with 32-bits address space hardware in mind. It
@@ -32,10 +32,14 @@ using Address = std::uintptr_t;
  * This is used to enforce the supported register sizes.
  */
 enum class RegBitSize : std::uint8_t {
-    b8,     //!< 8-bit register.
-    b16,    //!< 16-bit register.
-    b32,    //!< 32-bit register.
-    b64     //!< 64-bit register.
+    //! 8-bit register.
+    b8,    // NOLINT
+    //! 16-bit register.
+    b16,    // NOLINT
+    //! 32-bit register.
+    b32,    // NOLINT
+    //! 64-bit register.
+    b64    // NOLINT
 };
 
 
@@ -54,9 +58,13 @@ using FieldOffset = std::uint8_t;
  * This is used to define register masks.
  */
 template <typename T>
-struct type_mask {
+struct type_mask {    // NOLINT
     constexpr static const T value = std::numeric_limits<T>::max();
 };
+
+
+//! Global constant to convert bits to bytes.
+constexpr static const auto one_byte = std::size_t{8};
 
 
 }    // namespace cppreg

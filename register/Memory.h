@@ -2,7 +2,7 @@
 /**
  * @file      Memory.h
  * @author    Nicolas Clauvelin (nclauvelin@sendyne.com)
- * @copyright Copyright 2010-2019 Sendyne Corp. All rights reserved.
+ * @copyright Copyright 2010-2022 Sendyne Corp. All rights reserved.
  */
 
 
@@ -10,6 +10,7 @@
 #define CPPREG_DEV_MEMORY_H
 
 
+#include "Internals.h"
 #include "Traits.h"
 
 #include <array>
@@ -43,10 +44,10 @@ template <Address mem_address, std::size_t mem_byte_size>
 struct MemoryDevice {
 
     //! Storage type.
-    using memory_storage = std::array<volatile std::uint8_t, mem_byte_size>;
+    using MemStorage = std::array<volatile std::uint8_t, mem_byte_size>;
 
     //! Memory device storage.
-    static memory_storage& _mem_storage;
+    static MemStorage& _mem_storage;    // NOLINT
 
     //! Accessor.
     template <RegBitSize reg_size, std::size_t byte_offset>
@@ -59,7 +60,7 @@ struct MemoryDevice {
                                       reg_size>::type>::value>::value,
             "MemoryDevice:: ro request not aligned");
 
-        return *(reinterpret_cast<const volatile
+        return *(reinterpret_cast<const volatile    // NOLINT
                                   typename TypeTraits<reg_size>::type*>(
             &_mem_storage[byte_offset]));
     }
@@ -75,16 +76,17 @@ struct MemoryDevice {
                                       reg_size>::type>::value>::value,
             "MemoryDevice:: rw request not aligned");
 
-        return *(
+        return *(    // NOLINTNEXTLINE
             reinterpret_cast<volatile typename TypeTraits<reg_size>::type*>(
                 &_mem_storage[byte_offset]));
     }
 };
 
 //! Static reference definition.
-template <Address a, std::size_t s>
-typename MemoryDevice<a, s>::memory_storage& MemoryDevice<a, s>::_mem_storage =
-    *(reinterpret_cast<typename MemoryDevice<a, s>::memory_storage*>(a));
+template <Address a, std::size_t s>    // NOLINTNEXTLINE
+typename MemoryDevice<a, s>::MemStorage& MemoryDevice<a, s>::_mem_storage =
+    // NOLINTNEXTLINE
+    *(reinterpret_cast<typename MemoryDevice<a, s>::MemStorage*>(a));
 
 
 //! Register memory device for register pack.
@@ -95,7 +97,7 @@ typename MemoryDevice<a, s>::memory_storage& MemoryDevice<a, s>::_mem_storage =
  */
 template <typename RegisterPack>
 struct RegisterMemoryDevice {
-    using mem_device =
+    using mem_device =    // NOLINT
         MemoryDevice<RegisterPack::pack_base, RegisterPack::size_in_bytes>;
 };
 

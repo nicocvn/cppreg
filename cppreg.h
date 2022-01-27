@@ -2,7 +2,7 @@
 /**
  * @file      cppreg.h
  * @author    Nicolas Clauvelin (nclauvelin@sendyne.com)
- * @copyright Copyright 2010-2019 Sendyne Corp. All rights reserved.
+ * @copyright Copyright 2010-2022 Sendyne Corp. All rights reserved.
  */
 
 

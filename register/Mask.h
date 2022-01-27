@@ -2,7 +2,7 @@
 /**
  * @file      Mask.h
  * @author    Nicolas Clauvelin (nclauvelin@sendyne.com)
- * @copyright Copyright 2010-2019 Sendyne Corp. All rights reserved.
+ * @copyright Copyright 2010-2022 Sendyne Corp. All rights reserved.
  *
  * The implementation is designed to compute masks prior to runtime by
  * relying on constexpr function. This will work as intended if the function
@@ -28,9 +28,13 @@ namespace cppreg {
  */
 template <typename Mask>
 constexpr Mask make_mask(const FieldWidth width) noexcept {
-    return width == 0 ? static_cast<Mask>(0u)
-                      : static_cast<Mask>(
-                          (make_mask<Mask>(FieldWidth(width - 1)) << 1) | 1);
+    return width == 0U
+               ? static_cast<Mask>(0U)
+               : static_cast<Mask>(
+                   static_cast<Mask>(make_mask<Mask>(FieldWidth(
+                                         static_cast<FieldWidth>(width - 1U)))
+                                     << 1U)
+                   | 1U);
 }
 
 

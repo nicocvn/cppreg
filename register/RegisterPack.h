@@ -2,7 +2,7 @@
 /**
  * @file      RegisterPack.h
  * @author    Nicolas Clauvelin (nclauvelin@sendyne.com)
- * @copyright Copyright 2010-2019 Sendyne Corp. All rights reserved.
+ * @copyright Copyright 2010-2022 Sendyne Corp. All rights reserved.
  *
  * This header provides the definitions related to packed register
  * implementation.
@@ -37,28 +37,31 @@ template <typename RegisterPack,
           std::uint32_t bit_offset,
           typename TypeTraits<reg_size>::type reset_value = 0x0,
           bool use_shadow = false>
-struct PackedRegister : Register<RegisterPack::pack_base + (bit_offset / 8u),
-                                 reg_size,
-                                 reset_value,
-                                 use_shadow> {
+struct PackedRegister
+    : Register<RegisterPack::pack_base + (bit_offset / one_byte),
+               reg_size,
+               reset_value,
+               use_shadow> {
 
     //! Register pack.
-    using pack = RegisterPack;
+    using pack = RegisterPack;    // NOLINT
 
     //! Register type.
-    using base_reg = Register<RegisterPack::pack_base + (bit_offset / 8u),
-                              reg_size,
-                              reset_value,
-                              use_shadow>;
+    using base_reg =    // NOLINT
+        Register<RegisterPack::pack_base + (bit_offset / one_byte),
+                 reg_size,
+                 reset_value,
+                 use_shadow>;
 
     //! Memory modifier.
     /**
      * @return A reference to the writable register memory.
      */
     static typename base_reg::MMIO& rw_mem_device() noexcept {
-        using mem_device =
+        using MemDevice =
             typename RegisterMemoryDevice<RegisterPack>::mem_device;
-        return mem_device::template rw_memory<reg_size, (bit_offset / 8u)>();
+        return MemDevice::template rw_memory<reg_size,
+                                             (bit_offset / one_byte)>();
     }
 
     //! Memory accessor.
@@ -66,13 +69,14 @@ struct PackedRegister : Register<RegisterPack::pack_base + (bit_offset / 8u),
      * @return A reference to the read-only register memory.
      */
     static const typename base_reg::MMIO& ro_mem_device() noexcept {
-        using mem_device =
+        using MemDevice =
             typename RegisterMemoryDevice<RegisterPack>::mem_device;
-        return mem_device::template ro_memory<reg_size, (bit_offset / 8u)>();
+        return MemDevice::template ro_memory<reg_size,
+                                             (bit_offset / one_byte)>();
     }
 
     // Safety check to detect if are overflowing the pack.
-    static_assert(TypeTraits<reg_size>::byte_size + (bit_offset / 8u)
+    static_assert(TypeTraits<reg_size>::byte_size + (bit_offset / one_byte)
                       <= RegisterPack::size_in_bytes,
                   "PackRegister:: packed register is overflowing the pack");
 
@@ -84,7 +88,7 @@ struct PackedRegister : Register<RegisterPack::pack_base + (bit_offset / 8u),
                               TypeTraits<reg_size>::byte_size>::value,
         "PackedRegister:: pack base address is mis-aligned for register type");
     static_assert(
-        internals::is_aligned<RegisterPack::pack_base + (bit_offset / 8u),
+        internals::is_aligned<RegisterPack::pack_base + (bit_offset / one_byte),
                               TypeTraits<reg_size>::byte_size>::value,
         "PackedRegister:: offset address is mis-aligned for register type");
 };
@@ -102,15 +106,15 @@ template <typename... T>
 struct PackIndexing {
 
     //! Tuple type.
-    using tuple_t = typename std::tuple<T...>;
+    using tuple_t = typename std::tuple<T...>;    // NOLINT
 
     //! Number of elements.
     constexpr static const std::size_t n_elems =
         std::tuple_size<tuple_t>::value;
 
     //! Element accessor.
-    template <std::size_t N>
-    using elem = typename std::tuple_element<N, tuple_t>::type;
+    template <std::size_t n>
+    using elem = typename std::tuple_element<n, tuple_t>::type;    // NOLINT
 };
 
 
@@ -120,7 +124,7 @@ struct PackIndexing {
  * @tparam end End index value.
  */
 template <std::size_t start, std::size_t end>
-struct for_loop {
+struct for_loop {    // NOLINT
 
     //! Loop method.
     /**
@@ -131,8 +135,9 @@ struct for_loop {
     template <typename Func>
     static void apply() noexcept {
         Func().template operator()<start>();
-        if (start < end)
-            for_loop<start + 1ul, end>::template apply<Func>();
+        if (start < end) {
+            for_loop<start + 1, end>::template apply<Func>();
+        }
     }
 
 #if __cplusplus >= 201402L
@@ -150,7 +155,7 @@ struct for_loop {
     static void apply(Op&& f) noexcept {
         if (start < end) {
             f(std::integral_constant<std::size_t, start>{});
-            for_loop<start + 1ul, end>::apply(std::forward<Op>(f));
+            for_loop<start + 1, end>::apply(std::forward<Op>(f));
         };
     }
 #endif    // __cplusplus 201402L
@@ -161,8 +166,8 @@ struct for_loop<end, end> {
     static void apply() noexcept {}
 #if __cplusplus >= 201402L
     template <typename Op>
-    static void apply(Op&& f) noexcept {}
-#endif    // __cplusplus 201402L
+    static void apply(Op&&) noexcept {}    // NOLINT
+#endif                                     // __cplusplus 201402L
 };
 
 
@@ -171,7 +176,7 @@ struct for_loop<end, end> {
  * @tparam IndexedPack Indexed pack type.
  */
 template <typename IndexedPack>
-struct pack_loop : for_loop<0, IndexedPack::n_elems> {};
+struct pack_loop : for_loop<0, IndexedPack::n_elems> {};    // NOLINT
 
 
 }    // namespace cppreg

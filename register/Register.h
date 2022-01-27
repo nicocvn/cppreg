@@ -2,7 +2,7 @@
 /**
  * @file      Register.h
  * @author    Nicolas Clauvelin (nclauvelin@sendyne.com)
- * @copyright Copyright 2010-2019 Sendyne Corp. All rights reserved.
+ * @copyright Copyright 2010-2022 Sendyne Corp. All rights reserved.
  *
  * This header provides the definitions related to register implementation.
  */
@@ -40,13 +40,13 @@ template <Address reg_address,
 struct Register {
 
     //! Register base type.
-    using type = typename TypeTraits<reg_size>::type;
+    using type = typename TypeTraits<reg_size>::type;    // NOLINT
 
     //! MMIO pointer type.
     using MMIO = volatile type;
 
     //! Boolean flag for shadow value management.
-    using shadow = Shadow<Register, use_shadow>;
+    using shadow = Shadow<Register, use_shadow>;    // NOLINT
 
     //! Register base address.
     constexpr static auto base_address = reg_address;
@@ -58,15 +58,15 @@ struct Register {
     constexpr static auto reset = reset_value;
 
     //! Register pack for memory device.
-    using pack = RegisterPack<base_address, size / 8u>;
+    using pack = RegisterPack<base_address, size / one_byte>;    // NOLINT
 
     //! Memory modifier.
     /**
      * @return A reference to the writable register memory.
      */
     static MMIO& rw_mem_device() {
-        using mem_device = typename RegisterMemoryDevice<pack>::mem_device;
-        return mem_device::template rw_memory<reg_size, 0>();
+        using MemDevice = typename RegisterMemoryDevice<pack>::mem_device;
+        return MemDevice::template rw_memory<reg_size, 0>();
     }
 
     //! Memory accessor.
@@ -74,8 +74,8 @@ struct Register {
      * @return A reference to the read-only register memory.
      */
     static const MMIO& ro_mem_device() {
-        using mem_device = typename RegisterMemoryDevice<pack>::mem_device;
-        return mem_device::template ro_memory<reg_size, 0>();
+        using MemDevice = typename RegisterMemoryDevice<pack>::mem_device;
+        return MemDevice::template ro_memory<reg_size, 0>();
     }
 
     //! Merge write start function.
@@ -87,8 +87,9 @@ struct Register {
     template <typename F>
     static MergeWrite<typename F::parent_register, F::mask> merge_write(
         const typename F::type value) noexcept {
+        const auto lhs = static_cast<type>(value << F::offset);
         return MergeWrite<typename F::parent_register, F::mask>::create(
-            static_cast<type>((value << F::offset) & F::mask));
+            static_cast<type>(lhs & F::mask));
     }
 
     //! Merge write start function for constant value.
@@ -103,7 +104,7 @@ struct Register {
                                            F::mask,
                                            F::offset,
                                            value>>
-    static T&& merge_write() noexcept {
+    static T merge_write() noexcept {
 
         // Check overflow.
         static_assert(
@@ -111,11 +112,11 @@ struct Register {
                 value,
             "Register::merge_write<value>:: value too large for the field");
 
-        return std::move(T::create());
+        return T::create();
     }
 
     // Sanity check.
-    static_assert(size != 0u, "Register:: register definition with zero size");
+    static_assert(size != 0, "Register:: register definition with zero size");
 
     // Enforce alignment.
     static_assert(internals::is_aligned<reg_address,

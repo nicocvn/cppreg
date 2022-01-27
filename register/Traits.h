@@ -2,7 +2,7 @@
 /**
  * @file      Traits.h
  * @author    Nicolas Clauvelin (nclauvelin@sendyne.com)
- * @copyright Copyright 2010-2019 Sendyne Corp. All rights reserved.
+ * @copyright Copyright 2010-2022 Sendyne Corp. All rights reserved.
  *
  * This header provides some traits for register type instantiation.
  */
@@ -20,9 +20,9 @@ namespace cppreg {
 
 //! Register type traits based on size.
 /**
- * @tparam S Register size in bits.
+ * @tparam size Register size in bits.
  */
-template <RegBitSize S>
+template <RegBitSize size>
 struct TypeTraits {};
 
 
@@ -31,7 +31,7 @@ struct TypeTraits {};
 //! 8-bit specialization.
 template <>
 struct TypeTraits<RegBitSize::b8> {
-    using type = std::uint8_t;
+    using type = std::uint8_t;    // NOLINT
     constexpr static auto bit_size = std::uint8_t{8};
     constexpr static auto byte_size = std::uint8_t{bit_size / 8};
 };
@@ -39,7 +39,7 @@ struct TypeTraits<RegBitSize::b8> {
 //! 16-bit specialization.
 template <>
 struct TypeTraits<RegBitSize::b16> {
-    using type = std::uint16_t;
+    using type = std::uint16_t;    // NOLINT
     constexpr static auto bit_size = std::uint8_t{16};
     constexpr static auto byte_size = std::uint8_t{bit_size / 8};
 };
@@ -47,7 +47,7 @@ struct TypeTraits<RegBitSize::b16> {
 //! 32-bit specialization.
 template <>
 struct TypeTraits<RegBitSize::b32> {
-    using type = std::uint32_t;
+    using type = std::uint32_t;    // NOLINT
     constexpr static auto bit_size = std::uint8_t{32};
     constexpr static auto byte_size = std::uint8_t{bit_size / 8};
 };
@@ -55,7 +55,7 @@ struct TypeTraits<RegBitSize::b32> {
 //! 64-bit specialization.
 template <>
 struct TypeTraits<RegBitSize::b64> {
-    using type = std::uint64_t;
+    using type = std::uint64_t;    // NOLINT
     constexpr static auto bit_size = std::uint8_t{64};
     constexpr static auto byte_size = std::uint8_t{bit_size / 8};
 };

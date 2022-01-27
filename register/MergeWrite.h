@@ -2,7 +2,7 @@
 /**
  * @file      MergeWrite.h
  * @author    Nicolas Clauvelin (nclauvelin@sendyne.com)
- * @copyright Copyright 2010-2019 Sendyne Corp. All rights reserved.
+ * @copyright Copyright 2010-2022 Sendyne Corp. All rights reserved.
  *
  * The "merge write" implementation is designed to make it possible to merge
  * write operations on different fields into a single one.
@@ -45,26 +45,27 @@ template <typename Register,
           typename Register::type mask,
           FieldOffset offset,
           typename Register::type value>
-class MergeWrite_tmpl {
+class MergeWrite_tmpl {    // NOLINT
 
 private:
     // Type alias to register base type.
-    using base_type = typename Register::type;
+    using base_type = typename Register::type;    // NOLINT
 
     // Accumulated value.
-    constexpr static auto _accumulated_value =
+    constexpr static auto _accumulated_value =    // NOLINT
         base_type{(value << offset) & mask};
 
     // Combined mask.
-    constexpr static auto _combined_mask = mask;
+    constexpr static auto _combined_mask = mask;    // NOLINT
 
     // Type helper.
     template <typename F, base_type new_value>
-    using propagated =
+    using propagated =    // NOLINT
         MergeWrite_tmpl<Register,
                         (_combined_mask | F::mask),
                         FieldOffset{0},
-                        (_accumulated_value & ~F::mask)
+                        (_accumulated_value
+                         & static_cast<typename Register::type>(~F::mask))
                             | ((new_value << F::offset) & F::mask)>;
 
     // Default constructor.
@@ -80,12 +81,17 @@ public:
         return {};
     }
 
-    //!@{ Non-copyable and non-moveable.
+    //! Destructor.
+    ~MergeWrite_tmpl() = default;
+
+    //! Move constructor.
+    MergeWrite_tmpl(MergeWrite_tmpl&&) noexcept = default;
+
+    //!@{ Non-copyable and non-assignable.
     MergeWrite_tmpl(const MergeWrite_tmpl&) = delete;
     MergeWrite_tmpl& operator=(const MergeWrite_tmpl&) = delete;
     MergeWrite_tmpl& operator=(MergeWrite_tmpl&&) = delete;
     MergeWrite_tmpl operator=(MergeWrite_tmpl) = delete;
-    MergeWrite_tmpl(MergeWrite_tmpl&&) = delete;
     //!@}
 
     //! Closure method.
@@ -114,7 +120,7 @@ public:
      * @return A merge write instance with accumulated data.
      */
     template <typename F, base_type field_value>
-    propagated<F, field_value>&& with() const&& noexcept {
+    propagated<F, field_value> with() const&& noexcept {
 
         // Check that the field belongs to the register.
         static_assert(
@@ -129,7 +135,7 @@ public:
         static_assert(no_overflow,
                       "MergeWrite_tmpl:: field overflow in with() call");
 
-        return std::move(propagated<F, field_value>{});
+        return propagated<F, field_value>{};
     }
 };
 
@@ -147,17 +153,18 @@ class MergeWrite {
 
 private:
     // Type alias to register base type.
-    using base_type = typename Register::type;
+    using base_type = typename Register::type;    // NOLINT
 
     // Accumulated value.
-    base_type _accumulated_value;
+    base_type _accumulated_value;    // NOLINT
 
     // Combined mask.
-    constexpr static auto _combined_mask = mask;
+    constexpr static auto _combined_mask = mask;    // NOLINT
 
     // Type helper.
     template <typename F>
-    using propagated = MergeWrite<Register, _combined_mask | F::mask>;
+    using propagated =    // NOLINT
+        MergeWrite<Register, _combined_mask | F::mask>;
 
     // Private default constructor.
     constexpr MergeWrite() : _accumulated_value{0} {};
@@ -173,11 +180,14 @@ public:
         return MergeWrite(value);
     }
 
+    //! Destructor.
+    ~MergeWrite() = default;
+
     //!@ Move constructor.
     MergeWrite(MergeWrite&& mw) noexcept
         : _accumulated_value{mw._accumulated_value} {};
 
-    //!@{ Non-copyable.
+    //!@{ Non-copyable and non-assignable.
     MergeWrite(const MergeWrite&) = delete;
     MergeWrite& operator=(const MergeWrite&) = delete;
     MergeWrite& operator=(MergeWrite&&) = delete;
@@ -216,10 +226,11 @@ public:
             "field is not from the same register in merge_write");
 
         // Update accumulated value.
-        const auto new_value = static_cast<base_type>(
-            (_accumulated_value & ~F::mask) | ((value << F::offset) & F::mask));
-
-        return std::move(propagated<F>::create(new_value));
+        constexpr auto neg_mask = static_cast<base_type>(~F::mask);
+        const auto shifted_value = static_cast<base_type>(value << F::offset);
+        const auto lhs = static_cast<base_type>(_accumulated_value & neg_mask);
+        const auto rhs = static_cast<base_type>(shifted_value & F::mask);
+        return propagated<F>::create(static_cast<base_type>(lhs | rhs));
     }
 };
 
