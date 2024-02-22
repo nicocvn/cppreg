@@ -155,13 +155,13 @@ struct Peripheral {
         using Data = Field<Channel0, 8u, 0u, read_write>;
     };
     struct Channel1 : PackedRegister<Pack, RegBistSize::b8, 8 * 1> {
-        using Data = Field<Channel0, 8u, 0u, read_write>;
+        using Data = Field<Channel1, 8u, 0u, read_write>;
     };
     struct Channel2 : PackedRegister<Pack, RegBistSize::b8, 8 * 2> {
-        using Data = Field<Channel0, 8u, 0u, read_write>;
+        using Data = Field<Channel2, 8u, 0u, read_write>;
     };
     struct Channel3 : PackedRegister<Pack, RegBistSize::b8, 8 * 3> {
-        using Data = Field<Channel0, 8u, 0u, read_write>;
+        using Data = Field<Channel3, 8u, 0u, read_write>;
     };
     
 }
